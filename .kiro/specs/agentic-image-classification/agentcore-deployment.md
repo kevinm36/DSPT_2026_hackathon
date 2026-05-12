@@ -129,9 +129,13 @@ python scripts/deploy_hello_world.py \
       "Resource": "arn:aws:s3:::kevin-agentcore-bucket/*"
     },
     {
-      "Sid": "BedrockAgentCore",
+      "Sid": "BedrockAgentCoreAllPlanes",
       "Effect": "Allow",
-      "Action": "bedrock-agentcore:*",
+      "Action": [
+        "bedrock-agentcore:*",
+        "bedrock-agentcore-control:*",
+        "bedrock:*"
+      ],
       "Resource": "*"
     },
     {
@@ -143,6 +147,8 @@ python scripts/deploy_hello_world.py \
   ]
 }
 ```
+
+Note: `bedrock-agentcore-control:*` is required for runtime management (create, update, delete). `bedrock-agentcore:*` is for invoking runtimes. `bedrock:*` is for model invocation within the agent.
 
 To attach: IAM Console → Users → your_username → Add permissions → Create inline policy → JSON tab → paste the above.
 
