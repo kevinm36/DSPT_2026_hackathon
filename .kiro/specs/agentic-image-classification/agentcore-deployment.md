@@ -129,12 +129,11 @@ python scripts/deploy_hello_world.py \
       "Resource": "arn:aws:s3:::kevin-agentcore-bucket/*"
     },
     {
-      "Sid": "BedrockAgentCoreAllPlanes",
+      "Sid": "BedrockAll",
       "Effect": "Allow",
       "Action": [
-        "bedrock-agentcore:*",
-        "bedrock-agentcore-control:*",
-        "bedrock:*"
+        "bedrock:*",
+        "bedrock-agentcore:*"
       ],
       "Resource": "*"
     },
@@ -148,7 +147,9 @@ python scripts/deploy_hello_world.py \
 }
 ```
 
-Note: `bedrock-agentcore-control:*` is required for runtime management (create, update, delete). `bedrock-agentcore:*` is for invoking runtimes. `bedrock:*` is for model invocation within the agent.
+If the inline policy alone doesn't work, also attach these **managed policies** directly to the user:
+- `BedrockAgentCoreFullAccess`
+- `AmazonBedrockFullAccess`
 
 To attach: IAM Console → Users → your_username → Add permissions → Create inline policy → JSON tab → paste the above.
 
