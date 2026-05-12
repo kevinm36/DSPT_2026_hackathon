@@ -33,7 +33,7 @@ from typing import Any, Iterable, Optional
 
 import boto3
 
-from .categories import (
+from .categories_t1 import (
     DEFAULT_CATEGORIES_PATH,
     PROMPT_INSTRUCTION,
     build_categorization_prompt,
@@ -57,6 +57,41 @@ def _build_client(region: str = DEFAULT_REGION) -> Any:
     return boto3.client("bedrock-agentcore", region_name=region)
 
 
+def _canonical_path(p: Path | str) -> str:
+    """Resolve to an absolute, symlink-free path string.
+
+    Used everywhere we compare or store image paths so that different spellings
+    of the same image (relative vs absolute, ``./`` prefix, symlinks) collapse
+    to a single key. Without this, the resume check treats the relative path
+    used by the CLI default and the absolute path built by ``main.py`` as
+    different images and re-invokes the agent.
+    """
+    return str(Path(p).resolve())
+
+
+def _detect_image_format(image_bytes: bytes) -> str:
+    """Sniff the image format from magic bytes.
+
+    Returns one of ``png``, ``jpeg``, ``gif``, ``webp`` (the four formats
+    Bedrock/Claude accepts). Raises ``ValueError`` if the bytes don't match
+    any of them - lying about ``image_format`` to Claude is what produces the
+    "RuntimeClientError 500" we were getting on misnamed ADS-16 files (e.g.
+    files with a ``.png`` extension that are actually GIF or JPEG).
+    """
+    if image_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "png"
+    if image_bytes.startswith(b"\xff\xd8\xff"):
+        return "jpeg"
+    if image_bytes[:6] in (b"GIF87a", b"GIF89a"):
+        return "gif"
+    if image_bytes[:4] == b"RIFF" and image_bytes[8:12] == b"WEBP":
+        return "webp"
+    raise ValueError(
+        f"Unsupported image format (first 16 bytes: {image_bytes[:16]!r}). "
+        f"Bedrock/Claude only accepts png, jpeg, gif, webp."
+    )
+
+
 def invoke_one(
     image_path: Path,
     *,
@@ -65,12 +100,14 @@ def invoke_one(
     prompt: str = DEFAULT_PROMPT,
 ) -> dict:
     """Invoke the agent on a single image and return a flat result record."""
-    image_b64 = base64.b64encode(image_path.read_bytes()).decode("utf-8")
+    image_bytes = image_path.read_bytes()
+    image_format = _detect_image_format(image_bytes)
+    image_b64 = base64.b64encode(image_bytes).decode("utf-8")
     payload = json.dumps(
         {
             "prompt": prompt,
             "image_base64": image_b64,
-            "image_format": image_path.suffix.lstrip(".").lower(),
+            "image_format": image_format,
         }
     )
     response = client.invoke_agent_runtime(
@@ -84,14 +121,14 @@ def invoke_one(
     return {
         "category": image_path.parent.name,
         "image_id": image_path.stem,
-        "path": str(image_path),
+        "path": _canonical_path(image_path),
         "text": text,
         "usage": body["result"].get("metadata", {}).get("usage"),
     }
 
 
 def _load_processed_paths(output_path: Path) -> set[str]:
-    """Return the set of image paths already present in ``output_path``."""
+    """Return the set of canonical image paths already present in ``output_path``."""
     if not output_path.is_file():
         return set()
     seen: set[str] = set()
@@ -106,7 +143,9 @@ def _load_processed_paths(output_path: Path) -> set[str]:
                 continue
             path = record.get("path")
             if path and "error" not in record:
-                seen.add(path)
+                # Canonicalize so relative records from older runs match new
+                # absolute records (and vice versa).
+                seen.add(_canonical_path(path))
     return seen
 
 
@@ -171,7 +210,7 @@ def batch_invoke(
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     already_done = _load_processed_paths(output_path) if resume else set()
-    pending = [p for p in image_list if str(p) not in already_done]
+    pending = [p for p in image_list if _canonical_path(p) not in already_done]
 
     print(
         f"Found {len(image_list)} image(s); "

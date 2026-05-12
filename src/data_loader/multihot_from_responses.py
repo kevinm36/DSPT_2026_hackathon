@@ -39,11 +39,11 @@ from typing import Iterable, Optional
 import numpy as np
 import pandas as pd
 
-from .agent_processing.categories import DEFAULT_CATEGORIES_PATH, load_categories
+from .agent_processing.categories_t1 import DEFAULT_CATEGORIES_PATH, load_categories
 
 
-DEFAULT_RESPONSES_PATH = Path("Data/ads16_agent_responses.jsonl")
-DEFAULT_OUTPUT_PATH = Path("Data/ads16_multihot.csv")
+DEFAULT_RESPONSES_PATH = Path("Data/ads16_agent_responses_t1.jsonl")
+DEFAULT_OUTPUT_PATH = Path("Data/ads16_multihot_t1.csv")
 
 
 _NORMALIZE_WS = re.compile(r"\s+")
@@ -203,14 +203,25 @@ def responses_to_multihot(
     canonical_patterns = _build_canonical_patterns(categories)
     cat_index = {c: i for i, c in enumerate(categories)}
 
+    # Dedupe by synthesized image_id so repeated successful records for the
+    # same image (e.g. from old relative-path JSONLs and newer absolute-path
+    # ones) collapse to one row. Latest record wins, which is what you want
+    # after rerunning a noisy invocation.
+    deduped: dict[str, dict] = {}
+    for record in _iter_records(responses_path):
+        if "error" in record and not include_error_rows:
+            continue
+        key = image_id_format.format(
+            category=record.get("category", ""),
+            image_id=record.get("image_id", ""),
+        )
+        deduped[key] = record
+
     rows: list[dict] = []
     multihot_blocks: list[np.ndarray] = []
     unmatched_counter: Counter[str] = Counter()
 
-    for record in _iter_records(responses_path):
-        if "error" in record and not include_error_rows:
-            continue
-
+    for image_id_key, record in deduped.items():
         category = record.get("category", "")
         image_id_raw = record.get("image_id", "")
         path = record.get("path", "")
@@ -228,9 +239,7 @@ def responses_to_multihot(
 
         rows.append(
             {
-                "image_id": image_id_format.format(
-                    category=category, image_id=image_id_raw
-                ),
+                "image_id": image_id_key,
                 "category": category,
                 "image_index": image_id_raw,
                 "path": path,

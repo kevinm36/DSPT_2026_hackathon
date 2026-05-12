@@ -1,7 +1,7 @@
 """Agent-driven batch processing utilities for ADS-16 images."""
 
 from .batch_invoke_ads import batch_invoke, invoke_one
-from .categories import (
+from .categories_t1 import (
     DEFAULT_CATEGORIES_PATH,
     PROMPT_INSTRUCTION,
     build_categorization_prompt,
