@@ -116,90 +116,12 @@ aws sts get-caller-identity
 
 You should see your account ID and user ARN.
 
-### 4. Enable Model Access in Bedrock
-
-1. Open the [Amazon Bedrock console](https://console.aws.amazon.com/bedrock/home)
-2. Make sure the region selector (top-right) is set to **US East (N. Virginia) / us-east-1**
-3. In the left sidebar, click **Model access**
-4. Click **Manage model access**
-5. Find **Anthropic → Claude Sonnet 4** and check the box
-6. Click **Save changes**
-7. Wait until the status shows **Access granted**
-
-### 5. Create the AgentCore Execution Role
-
-The execution role is what the AgentCore runtime assumes to call Bedrock on your behalf.
-
-1. Open the [IAM console](https://console.aws.amazon.com/iam/home)
-2. Go to **Roles** → **Create role**
-3. For **Trusted entity type**, choose **Custom trust policy** and paste:
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Principal": {
-        "Service": "bedrock-agentcore.amazonaws.com"
-      },
-      "Action": "sts:AssumeRole"
-    }
-  ]
-}
-```
-
-4. Click **Next**
-5. Click **Create policy** (opens a new tab), switch to **JSON**, and paste:
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Sid": "BedrockInvokeModel",
-      "Effect": "Allow",
-      "Action": [
-        "bedrock:InvokeModel",
-        "bedrock:InvokeModelWithResponseStream"
-      ],
-      "Resource": "*"
-    },
-    {
-      "Sid": "CloudWatchLogs",
-      "Effect": "Allow",
-      "Action": [
-        "logs:CreateLogGroup",
-        "logs:CreateLogStream",
-        "logs:PutLogEvents"
-      ],
-      "Resource": "arn:aws:logs:*:*:log-group:/aws/bedrock-agentcore/*"
-    }
-  ]
-}
-```
-
-6. Name the policy (e.g., `AgentCoreExecutionPolicy`) and create it
-7. Back on the role creation tab, attach this policy
-8. Name the role (e.g., `AgentCoreExecutionRole`) and create it
-9. Copy the **Role ARN** — you'll need it when creating the agent runtime
-
-### 6. IAM Permissions for Your User / Caller
-
-Your IAM user (the one whose access keys you configured in `aws configure`) needs permission to invoke the agent. If you attached `AdministratorAccess` in step 2, you already have this. Otherwise, attach this as an inline policy on your IAM user:
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Action": "bedrock-agentcore:InvokeAgentRuntime",
-      "Resource": "*"
-    }
-  ]
-}
-```
+### 4. Fix permissions
+1. Go to IAM
+2. Select your user
+3. Add permission policies (Create online policy)
+4. Create one for the bedrock-agentcore and one for bedrock services
+5. Select all of the actions available for that service (no need to pick and choose)
 
 ---
 
