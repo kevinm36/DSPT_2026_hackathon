@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block content %}
+  <form
+    id="main-form"
+    class="card"
+    hx-post="/predict"
+    hx-target="#results"
+    hx-swap="innerHTML"
+    enctype="multipart/form-data"
+    hx-indicator="#predict-spinner"
+  >
+    <div class="tabs" role="tablist" aria-label="Input sections">
+      <button type="button" class="tab is-active" data-tab-target="images" role="tab" aria-selected="true">
+        Images
+      </button>
+      <button type="button" class="tab" data-tab-target="profile" role="tab" aria-selected="false">
+        Customer profile
+      </button>
+    </div>
+
+    <section id="panel-images" class="tab-panel is-active" role="tabpanel" aria-labelledby="tab-images">
+      <h2 class="panel-title">Upload images</h2>
+      <p class="hint">Attach between one and five images (JPEG, PNG, WebP, or GIF).</p>
+      <ol class="image-upload-list">
+        {% for i in range(1, 6) %}
+          <li>
+            <label for="img-{{ i }}">Image {{ i }}</label>
+            <input id="img-{{ i }}" type="file" name="images" accept="image/*" />
+          </li>
+        {% endfor %}
+      </ol>
+    </section>
+
+    <section id="panel-profile" class="tab-panel" role="tabpanel" hidden>
+      <h2 class="panel-title">Customer profile</h2>
+      <p class="hint">
+        Choose one value per attribute, or upload a single-row UTF-8 CSV whose headers match
+        <a href="/profile/csv-template">this template</a>. If a CSV is attached, it overrides the dropdowns.
+      </p>
+
+      <div class="profile-csv">
+        <label for="profile_csv">Profile CSV (optional)</label>
+        <input id="profile_csv" type="file" name="profile_csv" accept=".csv,text/csv" />
+      </div>
+
+      <div class="profile-grid">
+        {% for attr in attributes %}
+          <div class="field">
+            <label for="{{ attr.id }}">{{ attr.label }}</label>
+            <select id="{{ attr.id }}" name="{{ attr.id }}">
+              <option value="" disabled selected hidden>Choose…</option>
+              {% for opt in attr.options %}
+                <option value="{{ opt }}">{{ opt }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <div class="form-actions">
+      <button type="submit" class="btn primary" hx-disabled-elt="this">Predict</button>
+      <span id="predict-spinner" class="htmx-indicator muted">Running prediction…</span>
+    </div>
+  </form>
+
+  <section id="results" class="results-host card" aria-live="polite">
+    <h2 class="panel-title">Results</h2>
+    <p class="muted">Submit the form to see ranked affinity scores here.</p>
+  </section>
+
+  <script>
+    (function () {
+      var tabs = document.querySelectorAll(".tab");
+      var panels = {
+        images: document.getElementById("panel-images"),
+        profile: document.getElementById("panel-profile"),
+      };
+      tabs.forEach(function (tab) {
+        tab.addEventListener("click", function () {
+          var target = tab.getAttribute("data-tab-target");
+          tabs.forEach(function (t) {
+            t.classList.toggle("is-active", t === tab);
+            t.setAttribute("aria-selected", t === tab ? "true" : "false");
+          });
+          Object.keys(panels).forEach(function (key) {
+            var panel = panels[key];
+            var on = key === target;
+            panel.classList.toggle("is-active", on);
+            panel.toggleAttribute("hidden", !on);
+          });
+        });
+      });
+    })();
+  </script>
+{% endblock %}
