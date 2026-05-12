@@ -1,1 +1,17 @@
 Data/
+
+# Secrets / env config (never commit)
+config/agentcore.env
+.env
+
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+
+# Build artifacts
+*.zip
+.build/
