@@ -1,0 +1,262 @@
+:root {
+  color-scheme: light dark;
+  --bg: #0f1115;
+  --panel: #171a21;
+  --border: #2a3140;
+  --text: #e8ecf2;
+  --muted: #9aa4b5;
+  --accent: #5b8cff;
+  --accent-text: #0b1020;
+  --danger: #ff6b6b;
+  --radius: 12px;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: radial-gradient(1200px 600px at 20% -10%, #1c2740, var(--bg));
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.site-header {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 2.5rem 1.25rem 1rem;
+}
+
+.site-header h1 {
+  margin: 0 0 0.5rem;
+  font-size: clamp(1.5rem, 2.4vw, 2rem);
+  letter-spacing: -0.02em;
+}
+
+.lede {
+  margin: 0;
+  color: var(--muted);
+  max-width: 70ch;
+}
+
+main {
+  max-width: 960px;
+  margin: 0 auto 3rem;
+  padding: 0 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.card {
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.25rem 1.5rem;
+  backdrop-filter: blur(6px);
+}
+
+.tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.tab {
+  flex: 1;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  padding: 0.65rem 0.75rem;
+  border-radius: 10px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.tab.is-active {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.tab-panel {
+  display: none;
+}
+
+.tab-panel.is-active {
+  display: block;
+}
+
+.panel-title {
+  margin: 0 0 0.35rem;
+  font-size: 1.1rem;
+}
+
+.hint {
+  margin: 0 0 1rem;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.hint a {
+  color: var(--accent);
+}
+
+.image-upload-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.image-upload-list li {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.profile-csv {
+  margin-bottom: 1rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.profile-grid {
+  display: grid;
+  gap: 0.85rem;
+}
+
+@media (min-width: 640px) {
+  .profile-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.field label,
+.profile-csv label,
+.image-upload-list label {
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+select,
+input[type="file"] {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg) 70%, var(--panel));
+  color: var(--text);
+  padding: 0.55rem 0.6rem;
+  font: inherit;
+}
+
+.form-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.btn {
+  border: none;
+  border-radius: 10px;
+  padding: 0.65rem 1.1rem;
+  font: inherit;
+  cursor: pointer;
+}
+
+.btn.primary {
+  background: var(--accent);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+.btn.primary:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.results-host {
+  min-height: 140px;
+}
+
+.results-inner .panel-title {
+  margin-top: 0;
+}
+
+.table-wrap {
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.results-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.results-table th,
+.results-table td {
+  padding: 0.65rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.results-table th {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.results-table tr:last-child td {
+  border-bottom: none;
+}
+
+.reason {
+  max-width: 520px;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.error-message {
+  margin: 0;
+  color: var(--danger);
+}
+
+.htmx-indicator {
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.htmx-request.htmx-indicator {
+  opacity: 1;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f4f6fb;
+    --panel: #ffffff;
+    --border: #d7deea;
+    --text: #121826;
+    --muted: #5a6477;
+    --accent: #2f5bdd;
+    --accent-text: #ffffff;
+    --danger: #c62828;
+  }
+
+  body {
+    background: radial-gradient(1200px 600px at 20% -10%, #dfe8ff, var(--bg));
+  }
+}
