@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{% block title %}Image affinity{% endblock %}</title>
+    <link rel="stylesheet" href="/static/style.css" />
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <h1>Image affinity ranker</h1>
+      <p class="lede">
+        Upload up to five images and a categorical customer profile. The backend returns a ranked affinity score and a short reason per image (stub model until your trained model is wired in).
+      </p>
+    </header>
+    <main>{% block content %}{% endblock %}</main>
+  </body>
+</html>
