@@ -14,9 +14,15 @@ Pipeline stages:
    produce one weighted profile vector per user (``user_vector =
    sum_i rating_i * multihot_i``) -> ``Data/user_vectors.csv``.
 
-Run the whole thing::
+Run the whole thing against the already-deployed default runtime::
 
     python main.py
+
+One-shot lifecycle (deploy fresh runtime, run pipeline, delete)::
+
+    python main.py --deploy
+    python main.py --deploy --no-cleanup        # leave runtime running
+    python main.py --deploy --agent-name my_run # custom runtime name
 
 Skip stages you've already completed::
 
@@ -39,12 +45,14 @@ from typing import Iterable, Optional
 import numpy as np
 import pandas as pd
 
+from src.agentcore import delete_agent, deploy_agent
 from src.data_loader import ADS16DataProcessor, responses_to_multihot
 from src.data_loader.agent_processing import (
     DEFAULT_CATEGORIES_PATH,
     batch_invoke,
     load_categories,
 )
+from src.data_loader.agent_processing.batch_invoke_ads import DEFAULT_AGENT_ARN
 
 
 REPO_ROOT = Path(__file__).resolve().parent
@@ -57,9 +65,17 @@ CORPUS_ROOTS: list[Path] = [
     REPO_ROOT / "Data/ADS-16/ADS16_Benchmark_part2/ADS16_Benchmark_part2/Corpus/Corpus",
 ]
 
-RESPONSES_PATH = REPO_ROOT / "Data/ads16_agent_responses.jsonl"
-MULTIHOT_PATH = REPO_ROOT / "Data/ads16_multihot.csv"
-USER_VECTORS_PATH = REPO_ROOT / "Data/user_vectors.csv"
+RESPONSES_PATH = REPO_ROOT / "Data/ads16_agent_responses_t1.jsonl"
+MULTIHOT_PATH = REPO_ROOT / "Data/ads16_multihot_t1.csv"
+USER_VECTORS_PATH = REPO_ROOT / "Data/user_vectors_t1.csv"
+
+DEFAULT_AGENT_NAME = "ads16_image_agent"
+# Same handler shape as basic_img_agent_src/my_agent.py: accepts
+# {prompt, image_base64, image_format} and returns {"result": ...}.
+DEFAULT_SYSTEM_PROMPT = (
+    "You are an image classifier. Read the user's instructions carefully and "
+    "respond exactly as requested."
+)
 
 NUM_CATEGORIES = 20
 IMAGES_PER_CATEGORY = 15
@@ -226,131 +242,190 @@ def run(
     user_vectors_path: Path,
     rating_norm: str = "center",
     vector_norm: str = "l2",
+    deploy_first: bool = False,
+    cleanup: bool = True,
+    agent_name: str = DEFAULT_AGENT_NAME,
+    agent_arn: Optional[str] = None,
 ) -> None:
-    # ----- Stage 1: discover images
-    print("=" * 72)
-    print("Stage 1: discover images")
-    print("=" * 72)
-    images = discover_images(ADS_ROOTS)
-    print(f"Discovered {len(images)} images across {len(ADS_ROOTS)} roots.")
-    if images:
-        print(f"  first: {images[0].relative_to(REPO_ROOT)}")
-        print(f"  last:  {images[-1].relative_to(REPO_ROOT)}")
-    if len(images) != NUM_IMAGES:
-        print(
-            f"  [warn] expected {NUM_IMAGES} images (20 categories x 15), "
-            f"got {len(images)}.",
-            file=sys.stderr,
-        )
-
-    images_for_invoke = images[:limit] if limit else images
-
-    # ----- Stage 2: batch invoke
-    print()
-    print("=" * 72)
-    print("Stage 2: batch-invoke agent")
-    print("=" * 72)
-    if "invoke" in skip:
-        print(f"  [skip] reusing existing {responses_path}")
-        if not responses_path.is_file():
-            raise FileNotFoundError(
-                f"--skip invoke requested but {responses_path} does not exist."
+    # ----- Stage 0 (optional): deploy a fresh AgentCore runtime
+    deployed_runtime: Optional[dict] = None
+    if deploy_first:
+        if "invoke" in skip:
+            raise ValueError(
+                "--deploy is incompatible with --skip invoke: deploying a runtime "
+                "we never call wastes time and money. Drop one of the two flags."
             )
-    else:
-        batch_invoke(
-            output_path=responses_path,
-            categories_file=DEFAULT_CATEGORIES_PATH,
-            max_workers=max_workers,
-            images=images_for_invoke,
+        print("=" * 72)
+        print("Stage 0: deploy AgentCore runtime")
+        print("=" * 72)
+        deployed_runtime = deploy_agent(
+            name=agent_name,
+            system_prompt=DEFAULT_SYSTEM_PROMPT,
         )
+        print(f"  deployed: {deployed_runtime['name']}")
+        print(f"    id:     {deployed_runtime['id']}")
+        print(f"    arn:    {deployed_runtime['arn']}")
+        print(f"    status: {deployed_runtime['status']}")
+        agent_arn = deployed_runtime["arn"]
 
-    # ----- Stage 3: multi-hot
-    print()
-    print("=" * 72)
-    print("Stage 3: multi-hot from responses")
-    print("=" * 72)
-    if "multihot" in skip:
-        print(f"  [skip] reusing existing {multihot_path}")
-        if not multihot_path.is_file():
-            raise FileNotFoundError(
-                f"--skip multihot requested but {multihot_path} does not exist."
-            )
-    else:
-        df, unmatched = responses_to_multihot(
-            responses_path,
-            categories_path=DEFAULT_CATEGORIES_PATH,
-            image_id_format=IMAGE_ID_FORMAT,
-        )
-        multihot_path.parent.mkdir(parents=True, exist_ok=True)
-        df.to_csv(multihot_path, index=False)
-        print(f"Wrote {len(df)} rows x {df.shape[1]} cols to {multihot_path}")
-        if unmatched:
-            top = unmatched.most_common(5)
+    # The rest of the pipeline runs inside try/finally so a freshly deployed
+    # runtime gets torn down even if a later stage blows up.
+    try:
+        # ----- Stage 1: discover images
+        print()
+        print("=" * 72)
+        print("Stage 1: discover images")
+        print("=" * 72)
+        images = discover_images(ADS_ROOTS)
+        print(f"Discovered {len(images)} images across {len(ADS_ROOTS)} roots.")
+        if images:
+            print(f"  first: {images[0].relative_to(REPO_ROOT)}")
+            print(f"  last:  {images[-1].relative_to(REPO_ROOT)}")
+        if len(images) != NUM_IMAGES:
             print(
-                f"  unmatched response tokens: {sum(unmatched.values())} "
-                f"({len(unmatched)} unique). Top: {top}"
+                f"  [warn] expected {NUM_IMAGES} images (20 categories x 15), "
+                f"got {len(images)}.",
+                file=sys.stderr,
             )
 
-    # ----- Stage 4: weight user ratings
-    print()
-    print("=" * 72)
-    print("Stage 4: weight ratings -> user vectors")
-    print("=" * 72)
-    if "weight" in skip:
-        print(f"  [skip] not building {user_vectors_path}")
-        return
+        images_for_invoke = images[:limit] if limit else images
 
-    feature_columns = load_categories(DEFAULT_CATEGORIES_PATH)
-    available_users = discover_users(CORPUS_ROOTS)
-    if users:
-        missing = [u for u in users if u not in available_users]
-        if missing:
-            raise FileNotFoundError(
-                f"No rating CSV found for users: {missing}. "
-                f"Available: {sorted(available_users)[:5]}..."
+        # ----- Stage 2: batch invoke
+        print()
+        print("=" * 72)
+        print("Stage 2: batch-invoke agent")
+        print("=" * 72)
+        if "invoke" in skip:
+            print(f"  [skip] reusing existing {responses_path}")
+            if not responses_path.is_file():
+                raise FileNotFoundError(
+                    f"--skip invoke requested but {responses_path} does not exist."
+                )
+        else:
+            invoke_kwargs = dict(
+                output_path=responses_path,
+                categories_file=DEFAULT_CATEGORIES_PATH,
+                max_workers=max_workers,
+                images=images_for_invoke,
             )
-        target = {u: available_users[u] for u in users}
-    else:
-        target = available_users
-    print(
-        f"Weighting ratings for {len(target)} user(s) "
-        f"(rating-norm={rating_norm}, vector-norm={vector_norm})."
-    )
+            if agent_arn:
+                invoke_kwargs["agent_arn"] = agent_arn
+            batch_invoke(**invoke_kwargs)
 
-    rows: list[pd.Series] = []
-    failures: list[tuple[str, str]] = []
-    for uid, rt_path in sorted(target.items()):
-        try:
-            row = weight_user(
-                rt_path, multihot_path,
-                feature_columns=feature_columns,
-                rating_norm=rating_norm,
-                vector_norm=vector_norm,
+        # ----- Stage 3: multi-hot
+        print()
+        print("=" * 72)
+        print("Stage 3: multi-hot from responses")
+        print("=" * 72)
+        if "multihot" in skip:
+            print(f"  [skip] reusing existing {multihot_path}")
+            if not multihot_path.is_file():
+                raise FileNotFoundError(
+                    f"--skip multihot requested but {multihot_path} does not exist."
+                )
+        else:
+            df, unmatched = responses_to_multihot(
+                responses_path,
+                categories_path=DEFAULT_CATEGORIES_PATH,
+                image_id_format=IMAGE_ID_FORMAT,
             )
-        except Exception as exc:
-            failures.append((uid, repr(exc)))
-            print(f"  [error] {uid}: {exc}")
-            continue
-        rows.append(row)
+            multihot_path.parent.mkdir(parents=True, exist_ok=True)
+            df.to_csv(multihot_path, index=False)
+            print(f"Wrote {len(df)} rows x {df.shape[1]} cols to {multihot_path}")
+            if unmatched:
+                top = unmatched.most_common(5)
+                print(
+                    f"  unmatched response tokens: {sum(unmatched.values())} "
+                    f"({len(unmatched)} unique). Top: {top}"
+                )
+
+        # ----- Stage 4: weight user ratings
+        print()
+        print("=" * 72)
+        print("Stage 4: weight ratings -> user vectors")
+        print("=" * 72)
+        if "weight" in skip:
+            print(f"  [skip] not building {user_vectors_path}")
+            return
+
+        feature_columns = load_categories(DEFAULT_CATEGORIES_PATH)
+        available_users = discover_users(CORPUS_ROOTS)
+        if users:
+            missing = [u for u in users if u not in available_users]
+            if missing:
+                raise FileNotFoundError(
+                    f"No rating CSV found for users: {missing}. "
+                    f"Available: {sorted(available_users)[:5]}..."
+                )
+            target = {u: available_users[u] for u in users}
+        else:
+            target = available_users
         print(
-            f"  ok   {uid}: nnz={int((row != 0).sum())}, "
-            f"min={row.min():+.3f}, max={row.max():+.3f}"
+            f"Weighting ratings for {len(target)} user(s) "
+            f"(rating-norm={rating_norm}, vector-norm={vector_norm})."
         )
 
-    if rows:
-        out = pd.DataFrame(rows)
-        out.index.name = "user_id"
-        user_vectors_path.parent.mkdir(parents=True, exist_ok=True)
-        out.to_csv(user_vectors_path)
-        print(f"Wrote {out.shape[0]} user vector(s) x "
-              f"{out.shape[1]} categories to {user_vectors_path}")
-    else:
-        print("  no user vectors produced.", file=sys.stderr)
+        rows: list[pd.Series] = []
+        failures: list[tuple[str, str]] = []
+        for uid, rt_path in sorted(target.items()):
+            try:
+                row = weight_user(
+                    rt_path, multihot_path,
+                    feature_columns=feature_columns,
+                    rating_norm=rating_norm,
+                    vector_norm=vector_norm,
+                )
+            except Exception as exc:
+                failures.append((uid, repr(exc)))
+                print(f"  [error] {uid}: {exc}")
+                continue
+            rows.append(row)
+            print(
+                f"  ok   {uid}: nnz={int((row != 0).sum())}, "
+                f"min={row.min():+.3f}, max={row.max():+.3f}"
+            )
 
-    if failures:
-        print(f"\n{len(failures)} user(s) failed:", file=sys.stderr)
-        for uid, err in failures:
-            print(f"  {uid}: {err}", file=sys.stderr)
+        if rows:
+            out = pd.DataFrame(rows)
+            out.index.name = "user_id"
+            user_vectors_path.parent.mkdir(parents=True, exist_ok=True)
+            out.to_csv(user_vectors_path)
+            print(f"Wrote {out.shape[0]} user vector(s) x "
+                  f"{out.shape[1]} categories to {user_vectors_path}")
+        else:
+            print("  no user vectors produced.", file=sys.stderr)
+
+        if failures:
+            print(f"\n{len(failures)} user(s) failed:", file=sys.stderr)
+            for uid, err in failures:
+                print(f"  {uid}: {err}", file=sys.stderr)
+    finally:
+        # ----- Stage 5 (optional): tear down the runtime we deployed
+        if deployed_runtime is not None:
+            print()
+            print("=" * 72)
+            print("Stage 5: cleanup AgentCore runtime")
+            print("=" * 72)
+            if cleanup:
+                try:
+                    deleted = delete_agent(deployed_runtime["name"])
+                    print(f"  deleted {deployed_runtime['name']}: {deleted}")
+                except Exception as exc:
+                    # Don't mask whatever raised in the try block (if any).
+                    print(
+                        f"  [warn] failed to delete {deployed_runtime['name']}: "
+                        f"{exc!r}",
+                        file=sys.stderr,
+                    )
+            else:
+                print(
+                    f"  [skip] --no-cleanup; runtime left running: "
+                    f"{deployed_runtime['id']}"
+                )
+                print(
+                    f"    delete later: python -c \"from src.agentcore import "
+                    f"delete_agent; delete_agent('{deployed_runtime['name']}')\""
+                )
 
 
 def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
@@ -391,6 +466,38 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
             "'l1': sums to 1. 'none': raw magnitudes."
         ),
     )
+    parser.add_argument(
+        "--deploy", action="store_true",
+        help=(
+            "Deploy a fresh AgentCore runtime before stage 2 and (by default) "
+            "delete it after stage 4. Without this flag the pipeline calls the "
+            "existing runtime at --agent-arn (default: the hardcoded "
+            "DEFAULT_AGENT_ARN in batch_invoke_ads.py)."
+        ),
+    )
+    parser.add_argument(
+        "--no-cleanup", action="store_true",
+        help=(
+            "Only meaningful with --deploy: leave the deployed runtime running "
+            "after the pipeline finishes (matches tests/test_deploy.py)."
+        ),
+    )
+    parser.add_argument(
+        "--agent-name", default=DEFAULT_AGENT_NAME,
+        help=(
+            f"Runtime name to deploy/delete when --deploy is set. "
+            f"Default: {DEFAULT_AGENT_NAME!r}."
+        ),
+    )
+    parser.add_argument(
+        "--agent-arn", default=None,
+        help=(
+            "Override the AgentCore runtime ARN passed to batch_invoke. "
+            "Ignored when --deploy is set (the freshly-deployed ARN wins). "
+            f"Default: the hardcoded ARN in batch_invoke_ads.py "
+            f"({DEFAULT_AGENT_ARN!r})."
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -406,6 +513,10 @@ def main(argv: Optional[list[str]] = None) -> None:
         user_vectors_path=args.user_vectors,
         rating_norm=args.rating_norm,
         vector_norm=args.vector_norm,
+        deploy_first=args.deploy,
+        cleanup=not args.no_cleanup,
+        agent_name=args.agent_name,
+        agent_arn=args.agent_arn,
     )
 
 
