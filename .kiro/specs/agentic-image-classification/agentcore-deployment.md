@@ -112,23 +112,33 @@ python scripts/deploy_hello_world.py \
 
 ### IAM Permissions Required
 
-**For your IAM user** (to deploy and invoke):
+**For your IAM user** (to deploy and invoke) — attach this as a single inline policy:
 
 ```json
 {
   "Version": "2012-10-17",
   "Statement": [
     {
+      "Sid": "S3AgentArtifacts",
       "Effect": "Allow",
-      "Action": ["s3:PutObject", "s3:GetObject", "s3:DeleteObject"],
+      "Action": [
+        "s3:PutObject",
+        "s3:GetObject",
+        "s3:DeleteObject"
+      ],
       "Resource": "arn:aws:s3:::kevin-agentcore-bucket/*"
     },
     {
+      "Sid": "BedrockAll",
       "Effect": "Allow",
-      "Action": "bedrock-agentcore:*",
+      "Action": [
+        "bedrock:*",
+        "bedrock-agentcore:*"
+      ],
       "Resource": "*"
     },
     {
+      "Sid": "PassRoleToAgentCore",
       "Effect": "Allow",
       "Action": "iam:PassRole",
       "Resource": "arn:aws:iam::014498646416:role/service-role/AmazonBedrockAgentCoreRuntimeDefaultServiceRole-*"
@@ -136,6 +146,12 @@ python scripts/deploy_hello_world.py \
   ]
 }
 ```
+
+If the inline policy alone doesn't work, also attach these **managed policies** directly to the user:
+- `BedrockAgentCoreFullAccess`
+- `AmazonBedrockFullAccess`
+
+To attach: IAM Console → Users → your_username → Add permissions → Create inline policy → JSON tab → paste the above.
 
 **The runtime role** (`AmazonBedrockAgentCoreRuntimeDefaultServiceRole-rppbd`) already has the correct trust policy and permissions — no changes needed.
 

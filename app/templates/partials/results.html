@@ -1,0 +1,26 @@
+<div class="results-inner">
+  <h2 class="panel-title">Results</h2>
+  <p class="muted">Ranked by affinity (highest first).</p>
+  <div class="table-wrap">
+    <table class="results-table">
+      <thead>
+        <tr>
+          <th scope="col">Rank</th>
+          <th scope="col">Image</th>
+          <th scope="col">Affinity</th>
+          <th scope="col">Reason</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+          <tr>
+            <td>{{ row.rank }}</td>
+            <td>{{ row.filename }}</td>
+            <td>{{ "%.4f"|format(row.affinity) }}</td>
+            <td class="reason">{{ row.reason }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>

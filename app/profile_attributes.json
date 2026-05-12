@@ -1,0 +1,54 @@
+{
+  "attributes": [
+    {
+      "id": "attribute_1",
+      "label": "Attribute 1 (placeholder)",
+      "options": ["Option A", "Option B", "Option C"]
+    },
+    {
+      "id": "attribute_2",
+      "label": "Attribute 2 (placeholder)",
+      "options": ["Option A", "Option B", "Option C"]
+    },
+    {
+      "id": "attribute_3",
+      "label": "Attribute 3 (placeholder)",
+      "options": ["Option A", "Option B", "Option C"]
+    },
+    {
+      "id": "attribute_4",
+      "label": "Attribute 4 (placeholder)",
+      "options": ["Option A", "Option B", "Option C"]
+    },
+    {
+      "id": "attribute_5",
+      "label": "Attribute 5 (placeholder)",
+      "options": ["Option A", "Option B", "Option C"]
+    },
+    {
+      "id": "attribute_6",
+      "label": "Attribute 6 (placeholder)",
+      "options": ["Option A", "Option B", "Option C"]
+    },
+    {
+      "id": "attribute_7",
+      "label": "Attribute 7 (placeholder)",
+      "options": ["Option A", "Option B", "Option C"]
+    },
+    {
+      "id": "attribute_8",
+      "label": "Attribute 8 (placeholder)",
+      "options": ["Option A", "Option B", "Option C"]
+    },
+    {
+      "id": "attribute_9",
+      "label": "Attribute 9 (placeholder)",
+      "options": ["Option A", "Option B", "Option C"]
+    },
+    {
+      "id": "attribute_10",
+      "label": "Attribute 10 (placeholder)",
+      "options": ["Option A", "Option B", "Option C"]
+    }
+  ]
+}
