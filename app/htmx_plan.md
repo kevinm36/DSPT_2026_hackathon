@@ -22,7 +22,7 @@ Build a Python web app where the user uploads up to five images and supplies a c
 
 - **Multipart form** — files under `images` (repeatable, max five). Profile fields use each attribute `id` from `profile_attributes.json` (numerical and categorical), or `profile_csv` file.
 - **CSV** — header row exactly matching attribute `id` values in order; one body row. Numerical cells are numbers; categorical cells must be one of the full multihot column strings allowed for that grouped attribute.
-- **Vocabulary** — `profile_attributes.json` is built from `user_features_manifest.json` by `scripts/build_profile_attributes.py`. Each entry has `kind` (`information` / `preference`), `value_type` (`numerical` / `categorical`), `label`, and for categorical attributes a non-empty `options` list (full `type__name__value` tokens).
+- **Vocabulary** — `profile_attributes.json` is built from `user_features_manifest.json` by `scripts/build_profile_attributes.py`. Each entry has `kind` (`information` / `preference`), `value_type` (`numerical` / `categorical`), `label`, and for categorical attributes a non-empty `options` list of objects `{"value": "<token>", "label": "<arbitrary display text>"}` (legacy list of strings is still accepted and gets auto-generated labels).
 - **Results cache** — after a successful run, payload is stored in memory (`services/results_cache.py`) under a UUID `rid` (TTL ~1 hour, capped entries). Thumbnails use `data:` URLs built at submit time.
 
 ## Backend modules
@@ -47,7 +47,7 @@ Build a Python web app where the user uploads up to five images and supplies a c
 
 ## Security notes
 
-- Server-side validation of numerical (finite floats) and categorical (allowed option tokens) values from `profile_attributes.json`.
+- Server-side validation of numerical (finite, **non-negative**) and categorical (allowed `value` tokens) fields from `profile_attributes.json`.
 - Escape dynamic text in Jinja (default for `{{ }}`).
 - Result cache is process-local and time-bounded; do not rely on it for sensitive persistence.
 
@@ -75,7 +75,7 @@ Open `http://127.0.0.1:8000/`.
 
 ## Replacing placeholder profile metadata
 
-Edit `profile_attributes.json`: set real `label` strings, `id` keys, and `options` lists. Keep the `attributes` array in sync with your model features.
+Edit `profile_attributes.json`: set attribute `label`, categorical `options` entries as `value` + human `label` pairs, and keep `id` keys aligned with your model. Re-run `scripts/build_profile_attributes.py` after manifest changes, then adjust any `label` strings by hand if desired.
 
 ## Replacing the stub model
 

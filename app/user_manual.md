@@ -34,8 +34,8 @@ Fields come from `app/user_features_manifest.json` and are compiled into `app/pr
 
 ### 3a. Use the form (default)
 
-1. **Numerical** rows show a number box (for example age, hours, income). Defaults start at **0**; change them as needed.
-2. **Categorical** rows show a **dropdown**. Each option corresponds to one full multihot column name from the manifest (`type__attribute_name__attribute_value`). The menu shows a shortened label (the value segment) for readability; the value sent to the server is still the full token.
+1. **Numerical** rows show a number box (for example age, hours, income). Values must be **zero or positive** (non-negative); the browser also sets `min="0"`, and the server rejects negatives. Defaults start at **0**.
+2. **Categorical** rows show a **dropdown**. Each choice has a **stored value** (the full multihot token, e.g. `inf__fave_sports__individual_sports_tennis_archery`) and a **display label** defined in `profile_attributes.json` under `options` as `{"value": "...", "label": "..."}`. Edit `label` to any text you want without changing `value` (CSV and form submissions still use `value`).
 3. **Default for dropdowns:** the **first** option in the list for that attribute (manifest order within the group) is pre-selected.
 
 ### 3b. Upload a profile CSV (optional)
@@ -46,7 +46,7 @@ Use this when you already have a profile row in a spreadsheet or export.
 
 - File must be plain text **UTF-8** CSV.
 - **First row:** column headers only. Header names and **order** must match the app exactly: the `id` values in `app/profile_attributes.json` (one column per numerical field and one column per **grouped** categorical attribute such as `inf__fave_sports`, `pref__most_read_books`, etc.).
-- **Second row:** exactly **one** data row. Numerical cells must be finite numbers. Categorical cells must be one of the allowed full tokens for that column (same strings as in the dropdown `value` attributes).
+- **Second row:** exactly **one** data row. Numerical cells must be **finite and non-negative**. Categorical cells must be one of the allowed **value** strings for that column (the `value` field from `options`, not the display `label`).
 
 **Example file in this repository:** `app/sample_valid_profile.csv` — you can upload that file as-is to satisfy the validator, or copy its structure for your own data.
 
@@ -83,7 +83,7 @@ From the results page, use **← New prediction** to return to the home page and
 | Item | Notes |
 |------|--------|
 | Images field name | Multiple inputs named `images` (up to five files). |
-| Profile via form | Number inputs + one dropdown per categorical **group**; dropdown defaults = first manifest option in that group. |
+| Profile via form | Non-negative number inputs; categorical dropdowns use explicit `value` / `label` pairs from JSON. |
 | Profile via CSV | Overrides the form; see `app/sample_valid_profile.csv`. |
 | Predict | Submits everything to the server and opens ranked results. |
 

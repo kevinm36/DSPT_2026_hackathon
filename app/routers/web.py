@@ -47,7 +47,7 @@ async def index(request: Request) -> HTMLResponse:
 
 def _csv_template_default_cell(spec: AttributeSpec) -> str:
     if spec.value_type == "categorical":
-        return spec.options[0]
+        return spec.options[0].value
     return "0"
 
 

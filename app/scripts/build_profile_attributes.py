@@ -16,6 +16,15 @@ def _human_label(attr_id: str) -> str:
     return rest.replace("_", " ").strip().title()
 
 
+def _default_display_label(token: str) -> str:
+    """Initial UI label for a multihot token; edit `label` in JSON for arbitrary copy."""
+    if token.count("__") >= 2:
+        part = token.split("__", 2)[-1]
+    else:
+        part = token
+    return part.replace("_", " ").strip()
+
+
 def main() -> None:
     app_dir = Path(__file__).resolve().parents[1]
     manifest_path = app_dir / "user_features_manifest.json"
@@ -63,14 +72,15 @@ def main() -> None:
     for group_id in inf_groups + pref_groups:
         prefix = group_id.split("__", 1)[0]
         kind = "information" if prefix == "inf" else "preference"
-        opts = group_options[group_id]
+        tokens = group_options[group_id]
+        option_rows = [{"value": tok, "label": _default_display_label(tok)} for tok in tokens]
         attributes.append(
             {
                 "id": group_id,
                 "kind": kind,
                 "value_type": "categorical",
                 "label": _human_label(group_id),
-                "options": opts,
+                "options": option_rows,
             }
         )
 
@@ -87,7 +97,11 @@ def main() -> None:
         if a["value_type"] == "numerical":
             row.append("0")
         else:
-            row.append(str(a["options"][0]))
+            opts = a["options"]
+            assert isinstance(opts, list) and opts
+            first = opts[0]
+            assert isinstance(first, dict)
+            row.append(str(first["value"]))
     with sample_path.open("w", encoding="utf-8", newline="") as f:
         w = csv.writer(f)
         w.writerow(ids)

@@ -7,12 +7,29 @@ from pathlib import Path
 
 
 @dataclass(frozen=True)
+class CategoricalOption:
+    """Maps a stored attribute token (e.g. multihot column name) to a user-facing label."""
+
+    value: str
+    label: str
+
+
+@dataclass(frozen=True)
 class AttributeSpec:
     id: str
     label: str
     kind: str
     value_type: str
-    options: tuple[str, ...]
+    options: tuple[CategoricalOption, ...]
+
+
+def _default_label_from_token(token: str) -> str:
+    """Fallback display label when JSON lists options as plain strings (legacy)."""
+    if token.count("__") >= 2:
+        part = token.split("__", 2)[-1]
+    else:
+        part = token
+    return part.replace("_", " ").strip()
 
 
 def load_profile_vocab(path: Path) -> tuple[AttributeSpec, ...]:
@@ -40,22 +57,43 @@ def load_profile_vocab(path: Path) -> tuple[AttributeSpec, ...]:
             raise ValueError(f"Attribute {attr_id!r} needs value_type 'numerical' or 'categorical'")
         if not isinstance(options, list):
             raise ValueError(f"Attribute {attr_id!r} options must be a list")
-        str_options: list[str] = []
+
+        parsed: list[CategoricalOption] = []
         for opt in options:
-            if not isinstance(opt, str) or not opt.strip():
-                raise ValueError(f"Invalid option for {attr_id!r}")
-            str_options.append(opt)
-        if value_type == "categorical" and not str_options:
+            if isinstance(opt, str):
+                v = opt.strip()
+                if not v:
+                    raise ValueError(f"Invalid option string for {attr_id!r}")
+                parsed.append(CategoricalOption(value=v, label=_default_label_from_token(v)))
+            elif isinstance(opt, dict):
+                v = opt.get("value")
+                lb = opt.get("label")
+                if not isinstance(v, str) or not v.strip():
+                    raise ValueError(f"Each categorical option for {attr_id!r} needs a non-empty string value")
+                if not isinstance(lb, str) or not lb.strip():
+                    raise ValueError(f"Each categorical option for {attr_id!r} needs a non-empty string label")
+                parsed.append(CategoricalOption(value=v.strip(), label=lb.strip()))
+            else:
+                raise ValueError(f"Each option for {attr_id!r} must be a string or an object with value and label")
+
+        if value_type == "categorical" and not parsed:
             raise ValueError(f"Categorical attribute {attr_id!r} needs a non-empty options list")
-        if value_type == "numerical" and str_options:
+        if value_type == "numerical" and parsed:
             raise ValueError(f"Numerical attribute {attr_id!r} must have an empty options list")
+
+        seen_vals: set[str] = set()
+        for o in parsed:
+            if o.value in seen_vals:
+                raise ValueError(f"Duplicate option value {o.value!r} for attribute {attr_id!r}")
+            seen_vals.add(o.value)
+
         specs.append(
             AttributeSpec(
                 id=attr_id,
                 label=label,
                 kind=kind,
                 value_type=value_type,
-                options=tuple(str_options),
+                options=tuple(parsed),
             )
         )
 
@@ -81,7 +119,8 @@ def validate_profile(
         if spec.value_type == "categorical":
             if val == "":
                 raise ValueError(f"Missing value for {spec.label} ({spec.id})")
-            if val not in set(spec.options):
+            allowed = {o.value for o in spec.options}
+            if val not in allowed:
                 raise ValueError(f"Invalid value for {spec.label}: {val!r}")
             out[spec.id] = val
             continue
@@ -94,6 +133,8 @@ def validate_profile(
             raise ValueError(f"{spec.label} must be a number, got {val!r}") from exc
         if not math.isfinite(num):
             raise ValueError(f"{spec.label} must be a finite number")
+        if num < 0:
+            raise ValueError(f"{spec.label} must be zero or greater (non-negative)")
         out[spec.id] = val
 
     return out
