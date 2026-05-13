@@ -8,6 +8,47 @@ In this Hackathon project, we explore the use of Agentic Workflow to characteriz
 
 We used [Kaggle's ADS-16 dataset](https://www.kaggle.com/datasets/groffo/ads16-dataset) to build this demo.
 
+## Web app overview (`app/`)
+
+The **Image affinity ranker** (FastAPI + Jinja2 + HTMX under `app/`) lets a user attach **up to five** ad images, enter a **customer profile** (ADS16-style demographics and preferences, or a local CSV prefill), and run **Predict**. The backend scores each image, then shows a **ranked gallery**; clicking a thumbnail loads **per-image attributes** and **short reasoning** in a detail panel.
+
+The table below summarizes the flow. Thumbnails are **downscaled** in the README; **click a screenshot** in the third column to open the **full-size** PNG on GitHub.
+
+<table>
+  <thead>
+    <tr>
+      <th align="left">Step</th>
+      <th align="left">What you do</th>
+      <th align="left">Screenshot (click for full size)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr valign="top">
+      <td><strong>1. Customer profile</strong></td>
+      <td>Open the <strong>Customer profile</strong> tab. Fill numerical fields and categorical dropdowns, or load a one-row CSV in the browser to prefill the form (you can still edit values before submit).</td>
+      <td>
+        <a href="sample_screenshots/customer_profile_tab.png"><img src="sample_screenshots/customer_profile_tab.png" width="280" alt="Customer profile tab—click for full size"/></a>
+      </td>
+    </tr>
+    <tr valign="top">
+      <td><strong>2. Images</strong></td>
+      <td>Open the <strong>Images</strong> tab. Attach between one and five images (JPEG, PNG, WebP, or GIF).</td>
+      <td>
+        <a href="sample_screenshots/image_attachment_tab.png"><img src="sample_screenshots/image_attachment_tab.png" width="280" alt="Images tab—click for full size"/></a>
+      </td>
+    </tr>
+    <tr valign="top">
+      <td><strong>3. Results</strong></td>
+      <td>After <strong>Predict</strong>, the <strong>results</strong> page shows thumbnails <strong>sorted by score</strong> (best match first). Click a thumbnail to inspect model output and explanation. The capture reflects the <strong>HybridAgent</strong> inference path (Bedrock AgentCore image-ranking pipeline when <code>IMAGE_RANKING_AGENT_ARN</code> and related config are set).</td>
+      <td>
+        <a href="sample_screenshots/result_tab.png"><img src="sample_screenshots/result_tab.png" width="280" alt="Results tab—click for full size"/></a>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+Add the three captures under [`sample_screenshots/`](sample_screenshots/) as `customer_profile_tab.png`, `image_attachment_tab.png`, and `result_tab.png` (create the folder if needed; you supply the PNGs).
+
 ## To run the simulator
 
 - You first have to set up a conda environment with all dependencies, see `environment.yml` at the repository root.
