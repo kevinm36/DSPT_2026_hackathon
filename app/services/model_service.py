@@ -6,9 +6,25 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class ImagePrediction:
+    slot_index: int
     filename: str
     affinity: float
     reason: str
+    image_attributes: dict[str, str]
+
+
+def _stub_image_attributes(blob: bytes) -> dict[str, str]:
+    """Placeholder image-side categoricals until the real model returns them."""
+    h = hashlib.sha256(blob).hexdigest()
+    tones = ["warm", "cool", "neutral"]
+    densities = ["minimal", "balanced", "rich"]
+    moods = ["calm", "energetic", "formal"]
+    return {
+        "image_visual_tone": tones[int(h[:2], 16) % len(tones)],
+        "image_layout_density": densities[int(h[2:4], 16) % len(densities)],
+        "image_mood_signal": moods[int(h[4:6], 16) % len(moods)],
+        "image_palette_family": f"family_{int(h[6:8], 16) % 5}",
+    }
 
 
 def stub_predict(
@@ -23,15 +39,22 @@ def stub_predict(
     profile_digest = hashlib.sha256(profile_blob.encode("utf-8")).hexdigest()[:12]
 
     scored: list[ImagePrediction] = []
-    for filename, blob in image_payloads:
+    for slot_index, (filename, blob) in enumerate(image_payloads):
         h = hashlib.sha256(blob).hexdigest()
-        # Map first 8 hex chars to a float in [0, 1)
         affinity = int(h[:8], 16) / 0xFFFFFFFF
         reason = (
             f"Stub model: affinity derived from image hash and profile digest "
             f"{profile_digest}. Replace model_service.stub_predict with your trained model."
         )
-        scored.append(ImagePrediction(filename=filename, affinity=float(affinity), reason=reason))
+        scored.append(
+            ImagePrediction(
+                slot_index=slot_index,
+                filename=filename,
+                affinity=float(affinity),
+                reason=reason,
+                image_attributes=_stub_image_attributes(blob),
+            )
+        )
 
     scored.sort(key=lambda p: p.affinity, reverse=True)
     return scored

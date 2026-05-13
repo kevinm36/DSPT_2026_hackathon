@@ -1,0 +1,22 @@
+<div class="image-detail">
+  {% if error %}
+    <p class="error-message">{{ error }}</p>
+  {% else %}
+    <h3 class="detail-title">{{ filename }}</h3>
+
+    <section class="detail-block" aria-labelledby="attrs-heading">
+      <h4 id="attrs-heading" class="detail-subheading">Image attributes (model output)</h4>
+      <dl class="attr-grid">
+        {% for key, val in image_attributes.items() %}
+          <dt>{{ key }}</dt>
+          <dd>{{ val }}</dd>
+        {% endfor %}
+      </dl>
+    </section>
+
+    <section class="detail-block" aria-labelledby="reason-heading">
+      <h4 id="reason-heading" class="detail-subheading">Prediction reasoning</h4>
+      <p class="detail-reason">{{ reason }}</p>
+    </section>
+  {% endif %}
+</div>
