@@ -8,82 +8,6 @@ In this Hackathon project, we explore the use of Agentic Workflow to characteriz
 
 We used [Kaggle's ADS-16 dataset](https://www.kaggle.com/datasets/groffo/ads16-dataset) to build this demo.
 
-## Web app overview (`app/`)
-
-The **Image affinity ranker** lets a user attach **up to five** ad images, enter a **customer profile** (ADS16-style demographics and preferences, or a local CSV prefill), and run **Predict**. The backend scores each image, then shows a **ranked gallery**; clicking a thumbnail loads **per-image attributes** and **short reasoning** in a detail panel.
-
-The table below summarizes the flow.
-
-<table>
-  <thead>
-    <tr>
-      <th align="left">Step</th>
-      <th align="left">What you do</th>
-      <th align="left">Screenshot (click for full size)</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr valign="top">
-      <td><strong>1. Customer profile</strong></td>
-      <td>Open the <strong>Customer profile</strong> tab. Fill numerical fields and categorical dropdowns, or load a one-row CSV in the browser to prefill the form (you can still edit values before submit).</td>
-      <td>
-        <a href="sample_screenshots/customer_profile_tab.gif"><img src="sample_screenshots/customer_profile_thumbnail.gif" alt="Customer profile tab—click for full size"/></a>
-      </td>
-    </tr>
-    <tr valign="top">
-      <td><strong>2. Images</strong></td>
-      <td>Open the <strong>Images</strong> tab. Attach between one and five images (JPEG, PNG, WebP, or GIF).</td>
-      <td>
-        <a href="sample_screenshots/image_attachment_tab.gif"><img src="sample_screenshots/image_attachment_thumbnail.gif"  alt="Images tab—click for full size"/></a>
-      </td>
-    </tr>
-    <tr valign="top">
-      <td><strong>3. Results</strong></td>
-      <td>After <strong>Predict</strong>, the <strong>results</strong> page shows thumbnails <strong>sorted by score</strong> (best match first). Click a thumbnail to inspect model output and explanation. The capture reflects the <strong>HybridAgent</strong> inference path (Bedrock AgentCore image-ranking pipeline when <code>IMAGE_RANKING_AGENT_ARN</code> and related config are set).</td>
-      <td>
-        <a href="sample_screenshots/result_tab.gif"><img src="sample_screenshots/result_thumbnail.gif" alt="Results tab—click for full size"/></a>
-      </td>
-    </tr>
-  </tbody>
-</table>
-
-## To run the simulator
-
-- You first have to set up a conda environment with all dependencies, see `environment.yml` at the repository root.
-- You also have to get access to the AWS Bedrock agent, and set up the corresponding environment variables with proper credentials. See `.kiro/specs/agentic-image-classification/agentcore-deployment.md` for how to set this up.
-
-### Choosing the inference backend (`CustomInferenceInterface`)
-
-The web app loads **one** of two backends (both subclasses of `CustomInferenceInterface` in `app/services/model_service.py`):
-
-| Model | Role |
-| ----- | ---- |
-| **`ImageRankingAgentModel`** (default) | Calls the deployed **image ranking** Bedrock AgentCore runtime (`IMAGE_RANKING_AGENT_ARN`, plus `FEATURE_EXTRACTION_AGENT_ARN` as configured in `config/agentcore.env` or the environment). |
-| **`IabAgentInferenceModel`** | Runs the **LR user profile → IAB scores → in-process ranking agent** path (expects the saved LR bundle under `Data/models/`, etc.). |
-
-**How to select it**
-
-1. **Environment variable** (works with plain `uvicorn`):
-
-   ```bash
-   export AGENT_MODEL=IabAgentInferenceModel   # or ImageRankingAgentModel
-   uvicorn app.main:app --reload --app-dir .
-   ```
-
-   If `AGENT_MODEL` is unset or empty, the app defaults to **`ImageRankingAgentModel`**.
-
-2. **Module runner** (parses `--agent-model` then starts uvicorn for you). Stock `uvicorn` does **not** accept a custom `--agent-model` flag on its own CLI, so use:
-
-   ```bash
-   python -m app --agent-model ImageRankingAgentModel --reload --app-dir .
-   ```
-
-   This sets `AGENT_MODEL` internally and forwards the remaining arguments to `uvicorn`.
-
-On startup, the server prints a line such as `[agent-model] Loaded …` (or a message that it fell back to the hash **stub** if the requested model could not be constructed).
-
-- After choosing the backend, start the demo as above (`uvicorn …` or `python -m app …`).
-
 # ADS-16 User-Interest Modeling
 
 This repo runs two complementary models on the ADS-16 corpus:
@@ -348,9 +272,84 @@ All three predictions are evaluated against the same `y_binary` (for AUC, AP) an
 | `Data/ensemble_metrics.csv`                                        | `ensemble.py`                     | Pair-level AUC / AP / accuracy for `iab_only`, `sentient_only`, `mean`, `weighted_alpha=`*, `stack_lr_oof`, `max_confidence`, `oracle`. See `[docs/ensemble_results.md](docs/ensemble_results.md)`.                                 |
 | `Data/ensemble_pair_predictions.csv`                               | `ensemble.py --save-predictions`  | One row per (user, ad): `user_id, image_id, rating, y_pair, p_iab, p_sent, p_stack`.                                                                                                                                                |
 | `Data/voting_metrics.csv`                                          | `voting.py`                       | 6 base models (LR/Ridge/kNN on each of IAB and sentient sides) + 6 voting strategies (`majority_6`, `majority_iab`, `majority_sent`, `unanimous_6`, `any_6`, `vote_count`). See `[docs/voting_results.md](docs/voting_results.md)`. |
-| `Data/voting_pair_predictions.csv`                                 | `voting.py --save-predictions`    | One row per (user, ad) with each base model's binary vote and the total vote count.                                                                                                                                                 |
-
+| `Data/voting_pair_predictions.csv`                                 | `voting.py --save-predictions`    | One row per (user, ad) with each base model's binary vote and the total vote count.                                                                                          
 
 ## Dependencies
 
 The code runs against the conda env at `~/miniconda3_x64/envs/cos_env`. Required packages: `numpy`, `pandas`, `scikit-learn`, `scipy`, `boto3` (only for re-running the LLM stage).
+
+## Web app overview (`app/`)
+
+The **Image affinity ranker** lets a user attach **up to five** ad images, enter a **customer profile** (ADS16-style demographics and preferences, or a local CSV prefill), and run **Predict**. The backend scores each image, then shows a **ranked gallery**; clicking a thumbnail loads **per-image attributes** and **short reasoning** in a detail panel.
+
+The table below summarizes the flow.
+
+<table>
+  <thead>
+    <tr>
+      <th align="left">Step</th>
+      <th align="left">What you do</th>
+      <th align="left">Screenshot (click for full size)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr valign="top">
+      <td><strong>1. Customer profile</strong></td>
+      <td>Open the <strong>Customer profile</strong> tab. Fill numerical fields and categorical dropdowns, or load a one-row CSV in the browser to prefill the form (you can still edit values before submit).</td>
+      <td>
+        <a href="sample_screenshots/customer_profile_tab.gif"><img src="sample_screenshots/customer_profile_thumbnail.gif" alt="Customer profile tab—click for full size"/></a>
+      </td>
+    </tr>
+    <tr valign="top">
+      <td><strong>2. Images</strong></td>
+      <td>Open the <strong>Images</strong> tab. Attach between one and five images (JPEG, PNG, WebP, or GIF).</td>
+      <td>
+        <a href="sample_screenshots/image_attachment_tab.gif"><img src="sample_screenshots/image_attachment_thumbnail.gif"  alt="Images tab—click for full size"/></a>
+      </td>
+    </tr>
+    <tr valign="top">
+      <td><strong>3. Results</strong></td>
+      <td>After <strong>Predict</strong>, the <strong>results</strong> page shows thumbnails <strong>sorted by score</strong> (best match first). Click a thumbnail to inspect model output and explanation. The capture reflects the <strong>HybridAgent</strong> inference path (Bedrock AgentCore image-ranking pipeline when <code>IMAGE_RANKING_AGENT_ARN</code> and related config are set).</td>
+      <td>
+        <a href="sample_screenshots/result_tab.gif"><img src="sample_screenshots/result_thumbnail.gif" alt="Results tab—click for full size"/></a>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+## To run the simulator
+
+- You first have to set up a conda environment with all dependencies, see `environment.yml` at the repository root.
+- You also have to get access to the AWS Bedrock agent, and set up the corresponding environment variables with proper credentials. See `.kiro/specs/agentic-image-classification/agentcore-deployment.md` for how to set this up.
+
+### Choosing the inference backend (`CustomInferenceInterface`)
+
+The web app loads **one** of two backends (both subclasses of `CustomInferenceInterface` in `app/services/model_service.py`):
+
+| Model | Role |
+| ----- | ---- |
+| **`ImageRankingAgentModel`** (default) | Calls the deployed **image ranking** Bedrock AgentCore runtime (`IMAGE_RANKING_AGENT_ARN`, plus `FEATURE_EXTRACTION_AGENT_ARN` as configured in `config/agentcore.env` or the environment). |
+| **`IabAgentInferenceModel`** | Runs the **LR user profile → IAB scores → in-process ranking agent** path (expects the saved LR bundle under `Data/models/`, etc.). |
+
+**How to select it**
+
+1. **Environment variable** (works with plain `uvicorn`):
+
+   ```bash
+   export AGENT_MODEL=IabAgentInferenceModel   # or ImageRankingAgentModel
+   uvicorn app.main:app --reload --app-dir .
+   ```
+
+   If `AGENT_MODEL` is unset or empty, the app defaults to **`ImageRankingAgentModel`**.
+
+2. **Module runner** (parses `--agent-model` then starts uvicorn for you). Stock `uvicorn` does **not** accept a custom `--agent-model` flag on its own CLI, so use:
+
+   ```bash
+   python -m app --agent-model ImageRankingAgentModel --reload --app-dir .
+   ```
+
+   This sets `AGENT_MODEL` internally and forwards the remaining arguments to `uvicorn`.
+
+On startup, the server prints a line such as `[agent-model] Loaded …` (or a message that it fell back to the hash **stub** if the requested model could not be constructed).
+
+- After choosing the backend, start the demo as above (`uvicorn …` or `python -m app …`).
