@@ -74,6 +74,13 @@ from src.model.loader import ModelBundle, load_bundle
 
 _LOGGER = logging.getLogger(__name__)
 
+# Webapp-specific bundle location. The training-side defaults still point to
+# ``Data/models/`` (used by compare_models / train_sentient), but the IAB
+# bundles served by the FastAPI demo live here. Override at construction
+# time via ``IabAgentInferenceModel(models_dir=...)`` if you relocate them.
+REPO_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_WEBAPP_MODELS_DIR = REPO_ROOT / "saved_models"
+
 
 def _build_user_feature_dict(
     profile: dict[str, str], feature_names: list[str],
@@ -209,12 +216,16 @@ class IabAgentInferenceModel(CustomInferenceInterface):
         self, *,
         lr_bundle: Optional[ModelBundle] = None,
         bundle_name: str = "LR",
+        models_dir: Path = DEFAULT_WEBAPP_MODELS_DIR,
         agent_arn: str = DEFAULT_AGENT_ARN,
         region: str = DEFAULT_REGION,
         max_tagger_workers: int = 5,
         top_k_for_reasoning: int = 5,
     ) -> None:
-        self.lr_bundle = lr_bundle if lr_bundle is not None else load_bundle(bundle_name)
+        self.lr_bundle = (
+            lr_bundle if lr_bundle is not None
+            else load_bundle(bundle_name, models_dir=models_dir)
+        )
         self.tagger = _LlmTagger(
             agent_arn=agent_arn, region=region,
             max_workers=max_tagger_workers,

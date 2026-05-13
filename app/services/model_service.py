@@ -84,7 +84,7 @@ def _build_default_agent_model() -> CustomInferenceInterface:
     """Build the default model used by the FastAPI router.
 
     Tries the real IAB+ranking-agent model first (loads the saved LR bundle
-    from ``Data/models/lr_model.joblib`` and prepares the Bedrock tagger
+    from ``saved_models/lr_model.joblib`` and prepares the Bedrock tagger
     client). Falls back to the hash-based ``CustomInferenceInterface`` stub
     if the bundle is missing or import fails, so the dev server still boots
     when the trained artifacts aren't on disk.
