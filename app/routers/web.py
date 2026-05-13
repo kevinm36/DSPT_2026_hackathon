@@ -69,14 +69,12 @@ async def profile_csv_template() -> PlainTextResponse:
 async def submit_results(
     request: Request,
     images: list[UploadFile] = File(default_factory=list),
-    profile_csv: UploadFile | None = File(None),
 ) -> RedirectResponse | HTMLResponse:
     form = await request.form()
     form_map = dict(form)
 
     outcome = await submission.collect_submission(
         images=images,
-        profile_csv=profile_csv,
         form_map=form_map,
         vocab=_VOCAB,
     )
