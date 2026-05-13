@@ -16,22 +16,22 @@ Pipeline stages:
 
 Run the whole thing against the already-deployed default runtime::
 
-    python main.py
+    python -m src.data_loader.main
 
 One-shot lifecycle (deploy fresh runtime, run pipeline, delete)::
 
-    python main.py --deploy
-    python main.py --deploy --no-cleanup        # leave runtime running
-    python main.py --deploy --agent-name my_run # custom runtime name
+    python -m src.data_loader.main --deploy
+    python -m src.data_loader.main --deploy --no-cleanup        # leave runtime running
+    python -m src.data_loader.main --deploy --agent-name my_run # custom runtime name
 
 Skip stages you've already completed::
 
-    python main.py --skip invoke      # reuse existing JSONL
-    python main.py --skip invoke multihot
+    python -m src.data_loader.main --skip invoke      # reuse existing JSONL
+    python -m src.data_loader.main --skip invoke multihot
 
 Single-user smoke test::
 
-    python main.py --users U0001 --limit 6
+    python -m src.data_loader.main --users U0001 --limit 6
 """
 
 from __future__ import annotations
@@ -46,16 +46,18 @@ import numpy as np
 import pandas as pd
 
 from src.agentcore import delete_agent, deploy_agent
-from src.data_loader import ADS16DataProcessor, responses_to_multihot
-from src.data_loader.agent_processing import (
+
+from .ads16_processor import ADS16DataProcessor
+from .agent_processing import (
     DEFAULT_CATEGORIES_PATH,
     batch_invoke,
     load_categories,
 )
-from src.data_loader.agent_processing.batch_invoke_ads import DEFAULT_AGENT_ARN
+from .agent_processing.batch_invoke_ads import DEFAULT_AGENT_ARN
+from .multihot_from_responses import responses_to_multihot
 
 
-REPO_ROOT = Path(__file__).resolve().parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 ADS_ROOTS: list[Path] = [
     REPO_ROOT / "Data/ADS-16/ADS16_Benchmark_part1/Ads",
     REPO_ROOT / "Data/ADS-16/ADS16_Benchmark_part2/ADS16_Benchmark_part2/Ads/Ads",

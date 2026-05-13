@@ -46,7 +46,7 @@ from src.model.train_logistic import (
     _scorable,
     build_above_mean_labels,
 )
-from main import CORPUS_ROOTS, discover_users
+from src.data_loader import CORPUS_ROOTS, discover_users
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
