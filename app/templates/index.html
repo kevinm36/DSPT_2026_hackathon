@@ -34,12 +34,13 @@
       <p class="hint">
         Use <strong>Information</strong> fields (prefix <code>inf</code>) and <strong>Preference</strong> fields (prefix <code>pref</code>).
         Enter <strong>non-negative</strong> numbers where required, or choose one option per categorical dropdown (stored value is the manifest token; display text is defined per option in <code>profile_attributes.json</code>). You can instead upload a single-row UTF-8 CSV
-        whose headers match <a href="/profile/csv-template">this template</a> (see <code>app/sample_valid_profile.csv</code> for an example). If a CSV is attached, it overrides the form.
+        whose headers match <a href="/profile/csv-template">this template</a> (see <code>app/sample_valid_profile.csv</code> for an example). If a CSV is attached, it overrides the form on submit; choosing a file here also updates the fields below to match that row (preview).
       </p>
 
       <div class="profile-csv">
         <label for="profile_csv">Profile CSV (optional)</label>
         <input id="profile_csv" type="file" name="profile_csv" accept=".csv,text/csv" />
+        <p id="profile_csv_sync_status" class="hint subsection" role="status" aria-live="polite"></p>
       </div>
 
       <h3 class="profile-section-title">Information</h3>
@@ -123,6 +124,132 @@
             panel.toggleAttribute("hidden", !on);
           });
         });
+      });
+    })();
+  </script>
+  <script>
+    (function () {
+      var statusEl = document.getElementById("profile_csv_sync_status");
+      var csvInput = document.getElementById("profile_csv");
+      var panel = document.getElementById("panel-profile");
+      if (!csvInput || !panel) return;
+
+      function setStatus(text) {
+        if (statusEl) statusEl.textContent = text || "";
+      }
+
+      function parseCsvLine(line) {
+        var out = [];
+        var cur = "";
+        var inQuotes = false;
+        for (var i = 0; i < line.length; i++) {
+          var c = line.charAt(i);
+          if (inQuotes) {
+            if (c === '"') {
+              if (line.charAt(i + 1) === '"') {
+                cur += '"';
+                i++;
+              } else {
+                inQuotes = false;
+              }
+            } else {
+              cur += c;
+            }
+          } else if (c === '"') {
+            inQuotes = true;
+          } else if (c === ",") {
+            out.push(cur);
+            cur = "";
+          } else {
+            cur += c;
+          }
+        }
+        out.push(cur);
+        return out;
+      }
+
+      function resetProfileFieldsToDefaults() {
+        panel.querySelectorAll('.profile-grid input[type="number"]').forEach(function (inp) {
+          inp.value = "0";
+        });
+        panel.querySelectorAll(".profile-grid select").forEach(function (sel) {
+          if (sel.options.length) sel.selectedIndex = 0;
+        });
+      }
+
+      function applyRowToForm(rowMap) {
+        panel.querySelectorAll('.profile-grid input[type="number"]').forEach(function (inp) {
+          var name = inp.name;
+          if (!name || !Object.prototype.hasOwnProperty.call(rowMap, name)) return;
+          inp.value = String(rowMap[name]);
+        });
+        panel.querySelectorAll(".profile-grid select").forEach(function (sel) {
+          var name = sel.name;
+          if (!name || !Object.prototype.hasOwnProperty.call(rowMap, name)) return;
+          var val = rowMap[name];
+          var found = false;
+          for (var j = 0; j < sel.options.length; j++) {
+            if (sel.options[j].value === val) {
+              found = true;
+              break;
+            }
+          }
+          if (found) sel.value = val;
+        });
+      }
+
+      csvInput.addEventListener("change", function () {
+        var file = csvInput.files && csvInput.files[0];
+        if (!file) {
+          resetProfileFieldsToDefaults();
+          setStatus("CSV cleared; profile fields reset to defaults.");
+          return;
+        }
+
+        var reader = new FileReader();
+        reader.onload = function () {
+          var text = String(reader.result || "");
+          if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
+          var rawLines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
+          var lines = rawLines.filter(function (l) {
+            return l.replace(/\s/g, "").length > 0;
+          });
+          if (lines.length < 2) {
+            setStatus("CSV needs a header row and one data row; fields not updated.");
+            return;
+          }
+          var headers = parseCsvLine(lines[0]);
+          var cells = parseCsvLine(lines[1]);
+          if (headers.length !== cells.length) {
+            setStatus("Header and data row have different column counts; fields not updated.");
+            return;
+          }
+          var rowMap = {};
+          for (var i = 0; i < headers.length; i++) {
+            rowMap[headers[i].trim()] = cells[i].trim();
+          }
+          applyRowToForm(rowMap);
+          var badCats = [];
+          panel.querySelectorAll(".profile-grid select").forEach(function (sel) {
+            var name = sel.name;
+            if (!name || !Object.prototype.hasOwnProperty.call(rowMap, name)) return;
+            if (sel.value !== rowMap[name]) badCats.push(name);
+          });
+          var msg =
+            "Form fields updated from CSV (submit still uses this file as source of truth).";
+          if (badCats.length) {
+            msg +=
+              " These columns had no matching dropdown option (left as-is): " +
+              badCats.slice(0, 8).join(", ") +
+              (badCats.length > 8 ? "…" : "") +
+              ".";
+          }
+          setStatus(msg);
+        };
+        reader.onerror = function () {
+          setStatus("Could not read the file; fields not updated.");
+        };
+        reader.readAsText(file, "UTF-8");
       });
     })();
   </script>
