@@ -23,11 +23,14 @@ Run::
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
+import joblib
 import numpy as np
 import pandas as pd
+import sklearn
 from scipy.stats import spearmanr
 from sklearn.linear_model import LogisticRegression, Ridge
 from sklearn.metrics import average_precision_score, roc_auc_score
@@ -51,6 +54,29 @@ from src.data_loader import CORPUS_ROOTS, discover_users
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUT = REPO_ROOT / "Data/model_comparison.csv"
+DEFAULT_PREDS_OUT = REPO_ROOT / "Data/model_predictions_sample.csv"
+DEFAULT_MODELS_DIR = REPO_ROOT / "Data/models"
+
+# Filename for each saved model bundle. Loader reads these by key.
+MODEL_FILES: dict[str, str] = {
+    "LR":    "lr_model.joblib",
+    "Ridge": "ridge_model.joblib",
+    "kNN":   "knn_model.joblib",
+}
+
+# How each saved bundle should be invoked at predict time. Stored in the
+# bundle so the loader knows whether to call predict_proba or predict.
+SCORE_KIND: dict[str, str] = {
+    "LR":    "predict_proba",
+    "Ridge": "predict",
+    "kNN":   "predict",
+}
+
+SCORE_UNITS: dict[str, str] = {
+    "LR":    "P(net_likes >= min_net_likes), in [0, 1]",
+    "Ridge": "predicted net_likes (signed real)",
+    "kNN":   "predicted net_likes (signed real)",
+}
 
 
 # --------------------------------------------------------------------------- #
@@ -140,21 +166,89 @@ def _sweep(
     name: str, hparams: list, X: np.ndarray, y_bin: np.ndarray, y_net: np.ndarray,
     cat_names: list[str], cv: KFold,
     *, pipe_factory, predict_fn, target_for_predict: str,
-) -> tuple[float | int, pd.DataFrame]:
+) -> tuple[float | int, pd.DataFrame, dict[str, np.ndarray]]:
     print(f"  [{name}] hyperparameter sweep:")
     macros = []
     for h in hparams:
-        per_cat, _ = _per_category_scores(
+        per_cat, preds = _per_category_scores(
             X, y_bin, y_net, cat_names, cv,
             pipe_factory=pipe_factory, hparam=h,
             predict_fn=predict_fn, target_for_predict=target_for_predict,
         )
         macro_auc = per_cat.auc.mean(skipna=True)
-        macros.append((h, macro_auc, per_cat))
+        macros.append((h, macro_auc, per_cat, preds))
         print(f"    {name}={h:>8g}: macro AUC = {macro_auc:.4f}")
-    best_h, best_auc, best_per_cat = max(macros, key=lambda x: x[1])
+    best_h, best_auc, best_per_cat, best_preds = max(macros, key=lambda x: x[1])
     print(f"    -> best {name}={best_h} (macro AUC = {best_auc:.4f})")
-    return best_h, best_per_cat
+    return best_h, best_per_cat, best_preds
+
+
+# --------------------------------------------------------------------------- #
+# Final-fit bundling for export
+# --------------------------------------------------------------------------- #
+
+def _fit_per_category_final(
+    X: np.ndarray, y: np.ndarray, cat_names: list[str],
+    *, pipe_factory: Callable[..., Pipeline], hparam,
+    scorable_mask: np.ndarray,
+) -> tuple[dict[str, Pipeline], list[str]]:
+    """Fit one pipeline per scorable category on the full dataset (no CV).
+
+    ``scorable_mask`` is a boolean array of length ``len(cat_names)`` derived
+    from the *binary* labels (``_scorable(y_bin[:, k])``). Passed in
+    explicitly so all three saved bundles cover the same set of categories
+    regardless of which target each model was trained on.
+    """
+    models: dict[str, Pipeline] = {}
+    skipped: list[str] = []
+    for k_idx, cat in enumerate(cat_names):
+        if not scorable_mask[k_idx]:
+            skipped.append(cat)
+            continue
+        pipe = pipe_factory(hparam)
+        pipe.fit(X, y[:, k_idx])
+        models[cat] = pipe
+    return models, skipped
+
+
+def _build_bundle(
+    *, model_name: str, hparam, X: np.ndarray, y: np.ndarray,
+    cat_names: list[str], pipe_factory: Callable[..., Pipeline],
+    feature_names: list[str], min_net_likes: int,
+    scorable_mask: np.ndarray,
+) -> dict:
+    """Refit on all data and package everything the loader needs."""
+    models, skipped = _fit_per_category_final(
+        X, y, cat_names, pipe_factory=pipe_factory, hparam=hparam,
+        scorable_mask=scorable_mask,
+    )
+    return {
+        "model_name": model_name,
+        "best_hparam": hparam,
+        "feature_names": list(feature_names),  # column order required at predict time
+        "category_names": list(cat_names),
+        "scorable_categories": list(models.keys()),
+        "skipped_categories": skipped,
+        "models": models,                      # {cat: fitted Pipeline (StandardScaler + estimator)}
+        "score_kind": SCORE_KIND[model_name],  # "predict" or "predict_proba"
+        "score_units": SCORE_UNITS[model_name],
+        "training_metadata": {
+            "n_users": int(X.shape[0]),
+            "n_features": int(X.shape[1]),
+            "min_net_likes": min_net_likes,
+            "trained_at_utc": datetime.now(timezone.utc).isoformat(),
+            "library_versions": {
+                "sklearn": sklearn.__version__,
+                "numpy": np.__version__,
+                "pandas": pd.__version__,
+            },
+        },
+    }
+
+
+def _save_bundle(bundle: dict, path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump(bundle, path)
 
 
 # --------------------------------------------------------------------------- #
@@ -173,6 +267,9 @@ def run(
     min_feature_coverage: int,
     cv_folds: int,
     out_path: Optional[Path],
+    preds_out_path: Optional[Path],
+    preds_users: int,
+    save_models_dir: Optional[Path],
     seed: int,
 ) -> None:
     print("=" * 72)
@@ -218,19 +315,19 @@ def run(
     print("Stage C: hyperparameter sweeps (each model on its native target)")
     print("=" * 72)
 
-    best_C, lr_per_cat = _sweep(
+    best_C, lr_per_cat, lr_preds = _sweep(
         "C", Cs, X, y_bin, y_net, cat_names, cv,
         pipe_factory=_build_logreg, predict_fn=_predict_logreg,
         target_for_predict="bin",
     )
     print()
-    best_alpha, ridge_per_cat = _sweep(
+    best_alpha, ridge_per_cat, ridge_preds = _sweep(
         "alpha", alphas, X, y_bin, y_net, cat_names, cv,
         pipe_factory=_build_ridge, predict_fn=_predict_regressor,
         target_for_predict="net",
     )
     print()
-    best_k, knn_per_cat = _sweep(
+    best_k, knn_per_cat, knn_preds = _sweep(
         "k", knn_ks, X, y_bin, y_net, cat_names, cv,
         pipe_factory=_build_knn, predict_fn=_predict_regressor,
         target_for_predict="net",
@@ -305,6 +402,61 @@ def run(
         flat.to_csv(out_path)
         print(f"\n  wrote {out_path}")
 
+    if preds_out_path:
+        n = len(common) if preds_users <= 0 else min(preds_users, len(common))
+        sample_users = common[:n]
+        preds_df = pd.concat({
+            "LR":    pd.DataFrame(lr_preds,    index=common, columns=cat_names),
+            "Ridge": pd.DataFrame(ridge_preds, index=common, columns=cat_names),
+            "kNN":   pd.DataFrame(knn_preds,   index=common, columns=cat_names),
+        }, axis=1).loc[sample_users]
+        preds_df.index.name = "user_id"
+        preds_out_path.parent.mkdir(parents=True, exist_ok=True)
+        preds_df.to_csv(preds_out_path)
+        print(f"  wrote {preds_out_path}  "
+              f"({preds_df.shape[0]} users x {len(cat_names)} cats x 3 models)")
+        print(f"    note: these are out-of-fold CV predictions at the best "
+              f"hyperparameter per model")
+        print(f"    LR   = predicted P(y=1) in [0, 1]")
+        print(f"    Ridge/kNN = predicted continuous net-like score "
+              f"(real-valued, can be negative)")
+
+    if save_models_dir is not None:
+        print()
+        print("=" * 72)
+        print("Stage E: refit on full data and save model bundles")
+        print("=" * 72)
+        feature_names = list(X_df.columns)
+        scorable_mask = np.array(
+            [_scorable(y_bin[:, k]) for k in range(len(cat_names))]
+        )
+        bundle_specs = [
+            ("LR",    {"C": best_C},          y_bin, _build_logreg),
+            ("Ridge", {"alpha": best_alpha},  y_net, _build_ridge),
+            ("kNN",   {"k": best_k},          y_net, _build_knn),
+        ]
+        for name, hp, y_for_fit, factory in bundle_specs:
+            # _build_* take a scalar (C / alpha / k), not a dict; unwrap.
+            (raw_h,) = hp.values()
+            bundle = _build_bundle(
+                model_name=name,
+                hparam=raw_h,
+                X=X, y=y_for_fit, cat_names=cat_names,
+                pipe_factory=factory,
+                feature_names=feature_names,
+                min_net_likes=min_net_likes,
+                scorable_mask=scorable_mask,
+            )
+            # Restore the named hparam for the saved metadata.
+            bundle["best_hparam"] = hp
+            out = save_models_dir / MODEL_FILES[name]
+            _save_bundle(bundle, out)
+            print(f"  {name:<6} -> {out}  "
+                  f"({len(bundle['scorable_categories'])} cats, "
+                  f"{X.shape[1]} features, hparam={hp})")
+        print(f"  load with: from src.model.loader import load_bundle; "
+              f"b = load_bundle('Ridge')")
+
     print()
     print("=" * 72)
     print("Recommendation")
@@ -350,6 +502,19 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     p.add_argument("--min-feature-coverage", type=int, default=5)
     p.add_argument("--cv-folds", type=int, default=5)
     p.add_argument("--out", type=Path, default=DEFAULT_OUT)
+    p.add_argument("--preds-out", type=Path, default=DEFAULT_PREDS_OUT,
+                   help="Where to write the sample CV predictions CSV.")
+    p.add_argument("--preds-users", type=int, default=20,
+                   help="Number of users to include in the predictions CSV "
+                        "(0 = all). Default 20.")
+    p.add_argument("--save-models", action="store_true",
+                   help="After the sweep, refit each model on ALL data at "
+                        "its chosen hyperparameter and write a joblib bundle "
+                        "(LR / Ridge / kNN) to --models-dir for downstream "
+                        "demo / serving.")
+    p.add_argument("--models-dir", type=Path, default=DEFAULT_MODELS_DIR,
+                   help="Directory to write the .joblib model bundles into. "
+                        "Only used when --save-models is set.")
     p.add_argument("--no-save", action="store_true")
     p.add_argument("--seed", type=int, default=0)
     return p.parse_args(argv)
@@ -368,6 +533,11 @@ def main(argv: Optional[list[str]] = None) -> None:
         min_feature_coverage=args.min_feature_coverage,
         cv_folds=args.cv_folds,
         out_path=None if args.no_save else args.out,
+        preds_out_path=None if args.no_save else args.preds_out,
+        preds_users=args.preds_users,
+        save_models_dir=(
+            None if (args.no_save or not args.save_models) else args.models_dir
+        ),
         seed=args.seed,
     )
 

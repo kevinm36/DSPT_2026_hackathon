@@ -140,6 +140,65 @@ def build_above_mean_labels(
     return labels_df, net_df, dropped_cols
 
 
+def build_frac_positive_target(
+    rating_csv_paths: dict[str, Path],
+    multihot_csv: Path,
+    *,
+    positive_threshold: int = 3,
+    canonical_path: Optional[Path] = DEFAULT_CANONICAL,
+) -> tuple[pd.DataFrame, list[str]]:
+    """Per-(user, cat) ``frac_positive`` regression target in [0, 1].
+
+    Definition::
+
+        like[u, i]      = 1 if rating[u, i] >= positive_threshold else 0
+        coverage[k]     = sum over i of multihot[i, k]              (per cat)
+        frac_pos[u, k]  = like[u, :] @ multihot[:, k] / coverage[k]
+
+    Compared to the signed ``net_likes`` target, ``frac_positive``:
+      * uses a fixed per-ad threshold (3) instead of the per-user mean
+        (no per-user mean centring),
+      * is bounded in [0, 1] so it's less sensitive to a few mistagged ads
+        in cats with low coverage,
+      * is intended as an alternative regression target for Ridge / kNN.
+
+    The same canonical-filter + zero-exposure-filter is applied to the
+    multi-hot columns as in :func:`build_above_mean_labels`, so the
+    returned cat order matches.
+    """
+    M_df, all_cols = load_multihot(multihot_csv)
+    if canonical_path is not None:
+        canonical = set(load_categories(canonical_path))
+        cat_cols = [c for c in all_cols if c in canonical]
+    else:
+        cat_cols = all_cols
+    M_full = M_df[cat_cols].values
+    exposure = M_full.sum(axis=0)
+    cat_cols = [c for c, e in zip(cat_cols, exposure) if e > 0]
+
+    image_ids = [
+        IMAGE_ID_FOR(c, i)
+        for c in range(NUM_CATEGORIES)
+        for i in range(IMAGES_PER_CATEGORY)
+    ]
+    M = M_df.loc[image_ids, cat_cols].values
+    coverage = np.maximum(M.sum(axis=0), 1.0)
+
+    rows: dict[str, np.ndarray] = {}
+    for uid, rt_path in rating_csv_paths.items():
+        proc = ADS16DataProcessor(
+            rating_csv_path=rt_path,
+            multihot_csv_path=multihot_csv,
+            image_id_for=IMAGE_ID_FOR,
+            feature_columns=cat_cols,
+        )
+        r = proc.load_ratings().astype(np.float64)
+        like = (r >= positive_threshold).astype(np.float64)
+        rows[uid] = (like @ M) / coverage     # in [0, 1]
+
+    return pd.DataFrame(rows, index=cat_cols).T, cat_cols
+
+
 def _filter_features(
     X_df: pd.DataFrame, min_coverage: int,
 ) -> tuple[pd.DataFrame, list[str]]:
