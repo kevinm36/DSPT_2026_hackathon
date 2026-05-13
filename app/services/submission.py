@@ -7,7 +7,11 @@ from typing import Any
 
 from fastapi import UploadFile
 
-from app.services.vocab import AttributeSpec, validate_profile
+from app.services.vocab import (
+    INVALID_CATEGORICAL_PLACEHOLDER,
+    AttributeSpec,
+    validate_profile,
+)
 
 _MAX_IMAGES = 5
 _MAX_IMAGE_BYTES = 5 * 1024 * 1024
@@ -28,7 +32,19 @@ def parse_profile_csv(content: str, vocab: tuple[AttributeSpec, ...]) -> dict[st
     if not rows:
         raise ValueError("CSV must contain one data row")
     row = rows[0]
-    return {spec.id: (row.get(spec.id) or "").strip() for spec in vocab}
+    out = {spec.id: (row.get(spec.id) or "").strip() for spec in vocab}
+    for spec in vocab:
+        if spec.value_type != "categorical":
+            continue
+        v = out[spec.id]
+        if not v:
+            continue
+        allowed = {o.value for o in spec.options}
+        if v == INVALID_CATEGORICAL_PLACEHOLDER:
+            continue
+        if v not in allowed:
+            out[spec.id] = INVALID_CATEGORICAL_PLACEHOLDER
+    return out
 
 
 def field_as_str(form_data: dict[str, Any], key: str) -> str:
@@ -95,5 +111,15 @@ async def collect_submission(
         return str(exc)
     except UnicodeDecodeError:
         return "Profile CSV must be UTF-8 encoded text."
+
+    invalid_labels = sorted(
+        spec.label
+        for spec in vocab
+        if spec.value_type == "categorical"
+        and profile.get(spec.id) == INVALID_CATEGORICAL_PLACEHOLDER
+    )
+    if invalid_labels:
+        joined = ", ".join(invalid_labels)
+        return f"Some profile fields are invalid. Invalid fields: {joined}."
 
     return image_rows, profile

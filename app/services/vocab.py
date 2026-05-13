@@ -5,6 +5,9 @@ import math
 from dataclasses import dataclass
 from pathlib import Path
 
+# UI-only sentinel for categoricals (not stored in profile_attributes.json options).
+INVALID_CATEGORICAL_PLACEHOLDER = "invalid"
+
 
 @dataclass(frozen=True)
 class CategoricalOption:
@@ -64,12 +67,22 @@ def load_profile_vocab(path: Path) -> tuple[AttributeSpec, ...]:
                 v = opt.strip()
                 if not v:
                     raise ValueError(f"Invalid option string for {attr_id!r}")
+                if v == INVALID_CATEGORICAL_PLACEHOLDER:
+                    raise ValueError(
+                        f"Option value {INVALID_CATEGORICAL_PLACEHOLDER!r} is reserved for the UI; "
+                        f"choose a different token for {attr_id!r}"
+                    )
                 parsed.append(CategoricalOption(value=v, label=_default_label_from_token(v)))
             elif isinstance(opt, dict):
                 v = opt.get("value")
                 lb = opt.get("label")
                 if not isinstance(v, str) or not v.strip():
                     raise ValueError(f"Each categorical option for {attr_id!r} needs a non-empty string value")
+                if v.strip() == INVALID_CATEGORICAL_PLACEHOLDER:
+                    raise ValueError(
+                        f"Option value {INVALID_CATEGORICAL_PLACEHOLDER!r} is reserved for the UI; "
+                        f"choose a different token for {attr_id!r}"
+                    )
                 if not isinstance(lb, str) or not lb.strip():
                     raise ValueError(f"Each categorical option for {attr_id!r} needs a non-empty string label")
                 parsed.append(CategoricalOption(value=v.strip(), label=lb.strip()))
@@ -119,6 +132,9 @@ def validate_profile(
         if spec.value_type == "categorical":
             if val == "":
                 raise ValueError(f"Missing value for {spec.label} ({spec.id})")
+            if val == INVALID_CATEGORICAL_PLACEHOLDER:
+                out[spec.id] = val
+                continue
             allowed = {o.value for o in spec.options}
             if val not in allowed:
                 raise ValueError(f"Invalid value for {spec.label}: {val!r}")

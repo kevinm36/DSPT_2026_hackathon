@@ -64,6 +64,7 @@
                 {% for opt in attr.options %}
                   <option value="{{ opt.value }}"{% if loop.first %} selected{% endif %}>{{ opt.label }}</option>
                 {% endfor %}
+                <option value="invalid">{{ " " }}</option>
               </select>
             {% endif %}
           </div>
@@ -91,6 +92,7 @@
                 {% for opt in attr.options %}
                   <option value="{{ opt.value }}"{% if loop.first %} selected{% endif %}>{{ opt.label }}</option>
                 {% endfor %}
+                <option value="invalid">{{ " " }}</option>
               </select>
             {% endif %}
           </div>
@@ -194,7 +196,11 @@
               break;
             }
           }
-          if (found) sel.value = val;
+          if (found) {
+            sel.value = val;
+          } else {
+            sel.value = "invalid";
+          }
         });
       }
 
@@ -229,22 +235,9 @@
             rowMap[headers[i].trim()] = cells[i].trim();
           }
           applyRowToForm(rowMap);
-          var badCats = [];
-          panel.querySelectorAll(".profile-grid select").forEach(function (sel) {
-            var name = sel.name;
-            if (!name || !Object.prototype.hasOwnProperty.call(rowMap, name)) return;
-            if (sel.value !== rowMap[name]) badCats.push(name);
-          });
-          var msg =
-            "Form fields updated from CSV (submit still uses this file as source of truth).";
-          if (badCats.length) {
-            msg +=
-              " These columns had no matching dropdown option (left as-is): " +
-              badCats.slice(0, 8).join(", ") +
-              (badCats.length > 8 ? "…" : "") +
-              ".";
-          }
-          setStatus(msg);
+          setStatus(
+            "Form fields updated from CSV (submit still uses this file as source of truth)."
+          );
         };
         reader.onerror = function () {
           setStatus("Could not read the file; fields not updated.");
