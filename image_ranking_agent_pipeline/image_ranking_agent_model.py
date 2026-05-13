@@ -30,8 +30,10 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 class AgentModel(CustomInferenceInterface):
     """Calls the deployed image ranking agent to classify and score ads."""
 
-    def __init__(self, agent_arn: str | None = None, region: str | None = None):
-        self.agent_arn = agent_arn or self._resolve_arn()
+    def __init__(self, agent_arn: str | None = None, region: str | None = None,
+                 feature_extraction_arn: str | None = None):
+        self.agent_arn = agent_arn or self._resolve_env("IMAGE_RANKING_AGENT_ARN")
+        self.feature_extraction_arn = feature_extraction_arn or self._resolve_env("FEATURE_EXTRACTION_AGENT_ARN")
         self.region = region or os.environ.get("AWS_REGION", "us-east-1")
 
         if not self.agent_arn:
@@ -42,16 +44,16 @@ class AgentModel(CustomInferenceInterface):
             )
 
     @staticmethod
-    def _resolve_arn() -> str:
-        arn = os.environ.get("IMAGE_RANKING_AGENT_ARN", "")
-        if arn:
-            return arn
+    def _resolve_env(key: str) -> str:
+        val = os.environ.get(key, "")
+        if val:
+            return val
 
         env_path = _REPO_ROOT / "config" / "agentcore.env"
         if env_path.exists():
             for line in env_path.read_text().splitlines():
                 line = line.strip()
-                if line.startswith("IMAGE_RANKING_AGENT_ARN="):
+                if line.startswith(f"{key}="):
                     return line.split("=", 1)[1].strip()
         return ""
 
@@ -80,7 +82,7 @@ class AgentModel(CustomInferenceInterface):
             body = body.read().decode()
         result = json.loads(body)
 
-        return self._parse_response(result, image_payloads)
+        return self._parse_response(result, image_payloads, images)
 
     @staticmethod
     def _build_agent_profile(profile: dict[str, str]) -> dict:
@@ -132,10 +134,35 @@ class AgentModel(CustomInferenceInterface):
             })
         return images
 
+    def _extract_features(self, image_b64: str, image_format: str) -> dict[str, str]:
+        """Call the feature extraction agent for real image attributes."""
+        if not self.feature_extraction_arn:
+            return {}
+
+        try:
+            client = boto3.client("bedrock-agentcore", region_name=self.region)
+            response = client.invoke_agent_runtime(
+                agentRuntimeArn=self.feature_extraction_arn,
+                payload=json.dumps({
+                    "image_base64": image_b64,
+                    "image_format": image_format,
+                }),
+            )
+            body = response.get("response", "")
+            if hasattr(body, "read"):
+                body = body.read().decode()
+            result = json.loads(body)
+            features = result.get("result", {})
+            # Convert all values to strings for ImagePrediction
+            return {k: str(v) for k, v in features.items()}
+        except Exception:
+            return {}
+
     def _parse_response(
         self,
         result: dict,
         image_payloads: list[tuple[str, bytes]],
+        encoded_images: list[dict],
     ) -> list[ImagePrediction]:
         classifications = {c["image_id"]: c for c in result.get("classifications", [])}
         scores_by_id = {s["image_id"]: s for s in result.get("scores", [])}
@@ -147,16 +174,29 @@ class AgentModel(CustomInferenceInterface):
             # Normalize score from [-1, 1] to [0, 1]
             raw_score = score_info.get("score", 0.0)
             affinity = (raw_score + 1) / 2.0
+
+            # Get real image features from feature extraction agent
+            img_data = encoded_images[slot_index]
+            features = self._extract_features(
+                img_data["image_base64"], img_data["image_format"]
+            )
+
+            image_attributes = {
+                "ad_category": class_info.get("category", "Unknown"),
+                "classification_confidence": str(class_info.get("confidence", 0.0)),
+            }
+            if features:
+                image_attributes.update(features)
+            else:
+                # Fallback to stub if feature extraction unavailable
+                image_attributes.update(self._get_image_attributes(blob))
+
             predictions.append(ImagePrediction(
                 slot_index=slot_index,
                 filename=filename,
                 affinity=affinity,
                 reason=score_info.get("reasoning", "No reasoning provided"),
-                image_attributes={
-                    "ad_category": class_info.get("category", "Unknown"),
-                    "classification_confidence": str(class_info.get("confidence", 0.0)),
-                    **self._get_image_attributes(blob),
-                },
+                image_attributes=image_attributes,
             ))
 
         predictions.sort(key=lambda p: p.affinity, reverse=True)
