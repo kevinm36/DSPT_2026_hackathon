@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import csv
+import io
 import uuid
 from pathlib import Path
 from typing import Any
@@ -31,18 +33,31 @@ def _valid_rid(rid: str) -> bool:
 
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request) -> HTMLResponse:
+    info = tuple(a for a in _VOCAB if a.kind == "information")
+    pref = tuple(a for a in _VOCAB if a.kind == "preference")
     return _TEMPLATES.TemplateResponse(
         request=request,
         name="index.html",
-        context={"attributes": _VOCAB},
+        context={
+            "attributes_information": info,
+            "attributes_preference": pref,
+        },
     )
+
+
+def _csv_template_default_cell(spec: AttributeSpec) -> str:
+    if spec.value_type == "categorical":
+        return spec.options[0]
+    return "0"
 
 
 @router.get("/profile/csv-template", response_class=PlainTextResponse)
 async def profile_csv_template() -> PlainTextResponse:
-    header = ",".join(spec.id for spec in _VOCAB)
-    body = ",".join(spec.options[0] for spec in _VOCAB)
-    text = header + "\n" + body + "\n"
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow([spec.id for spec in _VOCAB])
+    writer.writerow([_csv_template_default_cell(spec) for spec in _VOCAB])
+    text = buf.getvalue()
     return PlainTextResponse(
         text,
         media_type="text/csv; charset=utf-8",

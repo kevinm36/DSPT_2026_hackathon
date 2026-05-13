@@ -144,6 +144,37 @@ main {
   color: var(--muted);
 }
 
+.hint.subsection {
+  margin-top: 0.25rem;
+  font-size: 0.88rem;
+}
+
+.profile-section-title {
+  margin: 1.25rem 0 0;
+  font-size: 1rem;
+  letter-spacing: 0.02em;
+}
+
+.profile-section-title:first-of-type {
+  margin-top: 0.5rem;
+}
+
+.mono-id {
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+input[type="number"] {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg) 70%, var(--panel));
+  color: var(--text);
+  padding: 0.55rem 0.6rem;
+  font: inherit;
+}
+
 select,
 input[type="file"] {
   width: 100%;

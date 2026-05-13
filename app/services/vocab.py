@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -9,6 +10,8 @@ from pathlib import Path
 class AttributeSpec:
     id: str
     label: str
+    kind: str
+    value_type: str
     options: tuple[str, ...]
 
 
@@ -24,19 +27,37 @@ def load_profile_vocab(path: Path) -> tuple[AttributeSpec, ...]:
             raise ValueError("Each attribute must be an object")
         attr_id = item.get("id")
         label = item.get("label")
-        options = item.get("options")
+        kind = item.get("kind")
+        value_type = item.get("value_type")
+        options = item.get("options", [])
         if not isinstance(attr_id, str) or not attr_id.strip():
             raise ValueError("Each attribute needs a non-empty string id")
         if not isinstance(label, str) or not label.strip():
             raise ValueError(f"Attribute {attr_id!r} needs a label")
-        if not isinstance(options, list) or not options:
-            raise ValueError(f"Attribute {attr_id!r} needs a non-empty options list")
+        if kind not in ("information", "preference"):
+            raise ValueError(f"Attribute {attr_id!r} needs kind 'information' or 'preference'")
+        if value_type not in ("numerical", "categorical"):
+            raise ValueError(f"Attribute {attr_id!r} needs value_type 'numerical' or 'categorical'")
+        if not isinstance(options, list):
+            raise ValueError(f"Attribute {attr_id!r} options must be a list")
         str_options: list[str] = []
         for opt in options:
             if not isinstance(opt, str) or not opt.strip():
                 raise ValueError(f"Invalid option for {attr_id!r}")
             str_options.append(opt)
-        specs.append(AttributeSpec(id=attr_id, label=label, options=tuple(str_options)))
+        if value_type == "categorical" and not str_options:
+            raise ValueError(f"Categorical attribute {attr_id!r} needs a non-empty options list")
+        if value_type == "numerical" and str_options:
+            raise ValueError(f"Numerical attribute {attr_id!r} must have an empty options list")
+        specs.append(
+            AttributeSpec(
+                id=attr_id,
+                label=label,
+                kind=kind,
+                value_type=value_type,
+                options=tuple(str_options),
+            )
+        )
 
     seen: set[str] = set()
     for spec in specs:
@@ -50,13 +71,29 @@ def load_profile_vocab(path: Path) -> tuple[AttributeSpec, ...]:
 def validate_profile(
     profile: dict[str, str], vocab: tuple[AttributeSpec, ...]
 ) -> dict[str, str]:
-    allowed = {spec.id: set(spec.options) for spec in vocab}
     out: dict[str, str] = {}
     for spec in vocab:
-        val = profile.get(spec.id)
-        if val is None or val == "":
+        raw = profile.get(spec.id)
+        if raw is None:
+            raw = ""
+        val = raw.strip() if isinstance(raw, str) else str(raw).strip()
+
+        if spec.value_type == "categorical":
+            if val == "":
+                raise ValueError(f"Missing value for {spec.label} ({spec.id})")
+            if val not in set(spec.options):
+                raise ValueError(f"Invalid value for {spec.label}: {val!r}")
+            out[spec.id] = val
+            continue
+
+        if val == "":
             raise ValueError(f"Missing value for {spec.label} ({spec.id})")
-        if val not in allowed[spec.id]:
-            raise ValueError(f"Invalid value for {spec.label}: {val!r}")
+        try:
+            num = float(val)
+        except ValueError as exc:
+            raise ValueError(f"{spec.label} must be a number, got {val!r}") from exc
+        if not math.isfinite(num):
+            raise ValueError(f"{spec.label} must be a finite number")
         out[spec.id] = val
+
     return out
