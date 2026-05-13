@@ -88,7 +88,7 @@ async def submit_results(
 
     image_rows, profile = outcome
     tuples = [(r["filename"], r["raw"]) for r in image_rows]
-    predictions = model_service.stub_predict(tuples, profile)
+    predictions = model_service.default_agent_model.predict(tuples, profile)
 
     items: list[dict[str, Any]] = []
     for rank, pred in enumerate(predictions, start=1):
