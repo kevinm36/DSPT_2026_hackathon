@@ -10,9 +10,9 @@ We used [Kaggle's ADS-16 dataset](https://www.kaggle.com/datasets/groffo/ads16-d
 
 ## Web app overview (`app/`)
 
-The **Image affinity ranker** (FastAPI + Jinja2 + HTMX under `app/`) lets a user attach **up to five** ad images, enter a **customer profile** (ADS16-style demographics and preferences, or a local CSV prefill), and run **Predict**. The backend scores each image, then shows a **ranked gallery**; clicking a thumbnail loads **per-image attributes** and **short reasoning** in a detail panel.
+The **Image affinity ranker** lets a user attach **up to five** ad images, enter a **customer profile** (ADS16-style demographics and preferences, or a local CSV prefill), and run **Predict**. The backend scores each image, then shows a **ranked gallery**; clicking a thumbnail loads **per-image attributes** and **short reasoning** in a detail panel.
 
-The table below summarizes the flow. Thumbnails are **downscaled** in the README; **click a screenshot** in the third column to open the **full-size** GIF on GitHub.
+The table below summarizes the flow.
 
 <table>
   <thead>
@@ -27,21 +27,21 @@ The table below summarizes the flow. Thumbnails are **downscaled** in the README
       <td><strong>1. Customer profile</strong></td>
       <td>Open the <strong>Customer profile</strong> tab. Fill numerical fields and categorical dropdowns, or load a one-row CSV in the browser to prefill the form (you can still edit values before submit).</td>
       <td>
-        <a href="sample_screenshots/customer_profile_tab.gif"><img src="sample_screenshots/customer_profile_tab.gif" width="140" alt="Customer profile tab—click for full size"/></a>
+        <a href="sample_screenshots/customer_profile_tab.gif"><img src="sample_screenshots/customer_profile_thumbnail.gif" alt="Customer profile tab—click for full size"/></a>
       </td>
     </tr>
     <tr valign="top">
       <td><strong>2. Images</strong></td>
       <td>Open the <strong>Images</strong> tab. Attach between one and five images (JPEG, PNG, WebP, or GIF).</td>
       <td>
-        <a href="sample_screenshots/image_attachment_tab.gif"><img src="sample_screenshots/image_attachment_tab.gif" width="140" alt="Images tab—click for full size"/></a>
+        <a href="sample_screenshots/image_attachment_tab.gif"><img src="sample_screenshots/image_attachment_thumbnail.gif"  alt="Images tab—click for full size"/></a>
       </td>
     </tr>
     <tr valign="top">
       <td><strong>3. Results</strong></td>
       <td>After <strong>Predict</strong>, the <strong>results</strong> page shows thumbnails <strong>sorted by score</strong> (best match first). Click a thumbnail to inspect model output and explanation. The capture reflects the <strong>HybridAgent</strong> inference path (Bedrock AgentCore image-ranking pipeline when <code>IMAGE_RANKING_AGENT_ARN</code> and related config are set).</td>
       <td>
-        <a href="sample_screenshots/result_tab.gif"><img src="sample_screenshots/result_tab.gif" width="140" alt="Results tab—click for full size"/></a>
+        <a href="sample_screenshots/result_tab.gif"><img src="sample_screenshots/result_thumbnail.gif" alt="Results tab—click for full size"/></a>
       </td>
     </tr>
   </tbody>
