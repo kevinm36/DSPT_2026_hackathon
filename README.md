@@ -27,21 +27,21 @@ The table below summarizes the flow. Thumbnails are **downscaled** in the README
       <td><strong>1. Customer profile</strong></td>
       <td>Open the <strong>Customer profile</strong> tab. Fill numerical fields and categorical dropdowns, or load a one-row CSV in the browser to prefill the form (you can still edit values before submit).</td>
       <td>
-        <a href="sample_screenshots/customer_profile_tab.gif"><img src="sample_screenshots/customer_profile_tab.gif" width="140" alt="Customer profile tab—click for full size"/></a>
+        <a href="sample_screenshots/customer_profile_tab.gif"><img src="sample_screenshots/customer_profile_tab.gif" width="70" alt="Customer profile tab—click for full size"/></a>
       </td>
     </tr>
     <tr valign="top">
       <td><strong>2. Images</strong></td>
       <td>Open the <strong>Images</strong> tab. Attach between one and five images (JPEG, PNG, WebP, or GIF).</td>
       <td>
-        <a href="sample_screenshots/image_attachment_tab.gif"><img src="sample_screenshots/image_attachment_tab.gif" width="140" alt="Images tab—click for full size"/></a>
+        <a href="sample_screenshots/image_attachment_tab.gif"><img src="sample_screenshots/image_attachment_tab.gif" width="70" alt="Images tab—click for full size"/></a>
       </td>
     </tr>
     <tr valign="top">
       <td><strong>3. Results</strong></td>
       <td>After <strong>Predict</strong>, the <strong>results</strong> page shows thumbnails <strong>sorted by score</strong> (best match first). Click a thumbnail to inspect model output and explanation. The capture reflects the <strong>HybridAgent</strong> inference path (Bedrock AgentCore image-ranking pipeline when <code>IMAGE_RANKING_AGENT_ARN</code> and related config are set).</td>
       <td>
-        <a href="sample_screenshots/result_tab.gif"><img src="sample_screenshots/result_tab.gif" width="140" alt="Results tab—click for full size"/></a>
+        <a href="sample_screenshots/result_tab.gif"><img src="sample_screenshots/result_tab.gif" width="70" alt="Results tab—click for full size"/></a>
       </td>
     </tr>
   </tbody>
