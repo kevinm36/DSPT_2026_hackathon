@@ -37,7 +37,7 @@ from sklearn.neighbors import KNeighborsRegressor
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
-from main import (
+from src.data_loader import (
     CORPUS_ROOTS,
     IMAGE_ID_FOR,
     IMAGES_PER_CATEGORY,

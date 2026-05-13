@@ -48,14 +48,14 @@ from sklearn.model_selection import KFold, cross_val_predict
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
-from main import (
+from src.data_loader import (
+    ADS16DataProcessor,
     CORPUS_ROOTS,
     IMAGE_ID_FOR,
     IMAGES_PER_CATEGORY,
     NUM_CATEGORIES,
     discover_users,
 )
-from src.data_loader import ADS16DataProcessor
 from src.data_loader.agent_processing.categories_t1 import (
     DEFAULT_CATEGORIES_PATH as DEFAULT_T1_PATH,
     load_categories,
