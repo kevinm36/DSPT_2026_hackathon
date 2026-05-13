@@ -42,7 +42,7 @@ import pandas as pd
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_MODELS_DIR = REPO_ROOT / "Data/models"
+DEFAULT_MODELS_DIR = REPO_ROOT / "saved_models"
 
 MODEL_FILES: dict[str, str] = {
     "LR":    "lr_model.joblib",

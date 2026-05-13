@@ -1,7 +1,18 @@
 from __future__ import annotations
 
 import hashlib
+import logging
+import os
 from dataclasses import dataclass
+from typing import Final
+
+logger = logging.getLogger(__name__)
+
+AGENT_MODEL_ENV: Final[str] = "AGENT_MODEL"
+AGENT_MODEL_CHOICES: Final[tuple[str, ...]] = (
+    "ImageRankingAgentModel",
+    "IabAgentInferenceModel",
+)
 
 
 @dataclass(frozen=True)
@@ -80,8 +91,8 @@ class CustomInferenceInterface:
         return scored
 
 
-def _build_default_agent_model() -> CustomInferenceInterface:
-    """Build the default model used by the FastAPI router.
+def configure_agent_model(name: str | None = None) -> CustomInferenceInterface:
+    """Load ``ImageRankingAgentModel`` or ``IabAgentInferenceModel``; fall back to stub on failure.
 
     Tries the real IAB+ranking-agent model first (loads the saved LR bundle
     from ``saved_models/lr_model.joblib`` and prepares the Bedrock tagger
@@ -89,30 +100,58 @@ def _build_default_agent_model() -> CustomInferenceInterface:
     if the bundle is missing or import fails, so the dev server still boots
     when the trained artifacts aren't on disk.
 
-    Imported at the bottom of the file (rather than at the top) so this
-    module's symbols (``CustomInferenceInterface`` / ``ImagePrediction``)
-    are already defined when ``src.inference.iab_agent_model`` imports
-    them - no circular-import dance required.
+
+    Updates the module-level ``default_agent_model`` used by ``routers/web.py``.
     """
-    import logging
-    log = logging.getLogger(__name__)
+    global default_agent_model
+    key = (name if name is not None else os.environ.get(AGENT_MODEL_ENV, "")).strip()
+    if not key:
+        key = "ImageRankingAgentModel"
+    if key not in AGENT_MODEL_CHOICES:
+        logger.warning(
+            "Unknown %s=%r (valid: %s). Using hash stub.",
+            AGENT_MODEL_ENV,
+            key,
+            ", ".join(AGENT_MODEL_CHOICES),
+        )
+        print(
+            f"[agent-model] Unknown {AGENT_MODEL_ENV}={key!r}; "
+            f"valid choices are {', '.join(AGENT_MODEL_CHOICES)}. "
+            "Loading CustomInferenceInterface (hash stub).",
+            flush=True,
+        )
+        default_agent_model = CustomInferenceInterface()
+        return default_agent_model
+
     try:
-        from src.inference.iab_agent_model import IabAgentInferenceModel
-        return IabAgentInferenceModel()
-    except FileNotFoundError as exc:
-        log.warning(
-            "IabAgentInferenceModel unavailable (saved LR bundle missing: %s); "
-            "falling back to hash-based stub.", exc,
-        )
+        if key == "ImageRankingAgentModel":
+            from image_ranking_agent_pipeline.image_ranking_agent_model import ImageRankingAgentModel
+
+            inst: CustomInferenceInterface = ImageRankingAgentModel()
+        else:
+            from src.inference.iab_agent_model import IabAgentInferenceModel
+
+            inst = IabAgentInferenceModel()
     except Exception:
-        log.exception(
-            "IabAgentInferenceModel construction failed; "
-            "falling back to hash-based stub."
+        logger.exception("%s failed to construct; using hash stub.", key)
+        print(
+            f"[agent-model] Failed to load {key}; falling back to "
+            "CustomInferenceInterface (hash stub). See logs for details.",
+            flush=True,
         )
-    return CustomInferenceInterface()
+        default_agent_model = CustomInferenceInterface()
+        return default_agent_model
+
+    default_agent_model = inst
+    logger.info("Using agent model %s (%s)", key, type(inst).__name__)
+    print(
+        f"[agent-model] Loaded {key} -> {type(inst).__module__}.{type(inst).__name__}",
+        flush=True,
+    )
+    return inst
 
 
-default_agent_model: CustomInferenceInterface = _build_default_agent_model()
+default_agent_model: CustomInferenceInterface = CustomInferenceInterface()
 
 
 def stub_predict(

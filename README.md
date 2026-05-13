@@ -10,9 +10,40 @@ We used [Kaggle's ADS-16 dataset](https://www.kaggle.com/datasets/groffo/ads16-d
 
 ## To run the simulator
 
-- You first have to set up a conda environment with all dependencies, see `environment.yml`.
+- You first have to set up a conda environment with all dependencies, see `environment.yml` at the repository root.
 - You also have to get access to the AWS Bedrock agent, and set up the corresponding environment variables with proper credentials. See `.kiro/specs/agentic-image-classification/agentcore-deployment.md` for how to set this up.
-- The demo can be run via `uvicorn app.main:app --reload --app-dir .`
+
+### Choosing the inference backend (`CustomInferenceInterface`)
+
+The web app loads **one** of two backends (both subclasses of `CustomInferenceInterface` in `app/services/model_service.py`):
+
+| Model | Role |
+| ----- | ---- |
+| **`ImageRankingAgentModel`** (default) | Calls the deployed **image ranking** Bedrock AgentCore runtime (`IMAGE_RANKING_AGENT_ARN`, plus `FEATURE_EXTRACTION_AGENT_ARN` as configured in `config/agentcore.env` or the environment). |
+| **`IabAgentInferenceModel`** | Runs the **LR user profile → IAB scores → in-process ranking agent** path (expects the saved LR bundle under `Data/models/`, etc.). |
+
+**How to select it**
+
+1. **Environment variable** (works with plain `uvicorn`):
+
+   ```bash
+   export AGENT_MODEL=IabAgentInferenceModel   # or ImageRankingAgentModel
+   uvicorn app.main:app --reload --app-dir .
+   ```
+
+   If `AGENT_MODEL` is unset or empty, the app defaults to **`ImageRankingAgentModel`**.
+
+2. **Module runner** (parses `--agent-model` then starts uvicorn for you). Stock `uvicorn` does **not** accept a custom `--agent-model` flag on its own CLI, so use:
+
+   ```bash
+   python -m app --agent-model ImageRankingAgentModel --reload --app-dir .
+   ```
+
+   This sets `AGENT_MODEL` internally and forwards the remaining arguments to `uvicorn`.
+
+On startup, the server prints a line such as `[agent-model] Loaded …` (or a message that it fell back to the hash **stub** if the requested model could not be constructed).
+
+- After choosing the backend, start the demo as above (`uvicorn …` or `python -m app …`).
 
 # ADS-16 User-Interest Modeling
 
