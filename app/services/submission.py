@@ -7,7 +7,12 @@ from typing import Any
 
 from fastapi import UploadFile
 
-from app.services.vocab import AttributeSpec, validate_profile
+from app.services.vocab import (
+    INVALID_CATEGORICAL_PLACEHOLDER,
+    INVALID_NUMERICAL_PLACEHOLDER,
+    AttributeSpec,
+    validate_profile,
+)
 
 _MAX_IMAGES = 5
 _MAX_IMAGE_BYTES = 5 * 1024 * 1024
@@ -28,7 +33,19 @@ def parse_profile_csv(content: str, vocab: tuple[AttributeSpec, ...]) -> dict[st
     if not rows:
         raise ValueError("CSV must contain one data row")
     row = rows[0]
-    return {spec.id: (row.get(spec.id) or "").strip() for spec in vocab}
+    out = {spec.id: (row.get(spec.id) or "").strip() for spec in vocab}
+    for spec in vocab:
+        if spec.value_type != "categorical":
+            continue
+        v = out[spec.id]
+        if not v:
+            continue
+        allowed = {o.value for o in spec.options}
+        if v == INVALID_CATEGORICAL_PLACEHOLDER:
+            continue
+        if v not in allowed:
+            out[spec.id] = INVALID_CATEGORICAL_PLACEHOLDER
+    return out
 
 
 def field_as_str(form_data: dict[str, Any], key: str) -> str:
@@ -53,13 +70,13 @@ def data_url_for_image(content_type: str, raw: bytes) -> str:
 async def collect_submission(
     *,
     images: list[UploadFile],
-    profile_csv: UploadFile | None,
     form_map: dict[str, Any],
     vocab: tuple[AttributeSpec, ...],
 ) -> tuple[list[dict[str, Any]], dict[str, str]] | str:
     """
     Returns (image_rows, profile) on success, where each image row has
-    filename, raw bytes, content_type. On failure returns an error message string.
+    filename, raw bytes, content_type. Profile values are taken from form_map
+    (multipart field names matching attribute ids). On failure returns an error message string.
     """
     non_empty_images = [f for f in images if f.filename]
     if not non_empty_images:
@@ -85,15 +102,23 @@ async def collect_submission(
 
     profile_raw: dict[str, str]
     try:
-        if profile_csv and profile_csv.filename:
-            text = (await profile_csv.read()).decode("utf-8")
-            profile_raw = parse_profile_csv(text, vocab)
-        else:
-            profile_raw = merge_profile_from_form(form_map, vocab)
+        profile_raw = merge_profile_from_form(form_map, vocab)
         profile = validate_profile(profile_raw, vocab)
     except ValueError as exc:
         return str(exc)
-    except UnicodeDecodeError:
-        return "Profile CSV must be UTF-8 encoded text."
+
+    def _is_invalid_field(spec: AttributeSpec) -> bool:
+        if spec.value_type == "categorical":
+            return profile.get(spec.id) == INVALID_CATEGORICAL_PLACEHOLDER
+        if spec.value_type == "numerical":
+            return profile.get(spec.id) == INVALID_NUMERICAL_PLACEHOLDER
+        return False
+
+    invalid_labels = [
+        spec.label for spec in vocab if spec.kind == "information" and _is_invalid_field(spec)
+    ] + [spec.label for spec in vocab if spec.kind == "preference" and _is_invalid_field(spec)]
+    if invalid_labels:
+        joined = ", ".join(invalid_labels)
+        return f"Some profile fields are invalid. Invalid fields: {joined}."
 
     return image_rows, profile

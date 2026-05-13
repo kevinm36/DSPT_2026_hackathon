@@ -5,6 +5,11 @@ import math
 from dataclasses import dataclass
 from pathlib import Path
 
+# UI-only sentinel for categoricals (not stored in profile_attributes.json options).
+INVALID_CATEGORICAL_PLACEHOLDER = "invalid"
+# Internal sentinel for failed numerical validation (empty, ill-formed, negative, non-finite).
+INVALID_NUMERICAL_PLACEHOLDER = "__invalid_numerical__"
+
 
 @dataclass(frozen=True)
 class CategoricalOption:
@@ -64,12 +69,22 @@ def load_profile_vocab(path: Path) -> tuple[AttributeSpec, ...]:
                 v = opt.strip()
                 if not v:
                     raise ValueError(f"Invalid option string for {attr_id!r}")
+                if v == INVALID_CATEGORICAL_PLACEHOLDER:
+                    raise ValueError(
+                        f"Option value {INVALID_CATEGORICAL_PLACEHOLDER!r} is reserved for the UI; "
+                        f"choose a different token for {attr_id!r}"
+                    )
                 parsed.append(CategoricalOption(value=v, label=_default_label_from_token(v)))
             elif isinstance(opt, dict):
                 v = opt.get("value")
                 lb = opt.get("label")
                 if not isinstance(v, str) or not v.strip():
                     raise ValueError(f"Each categorical option for {attr_id!r} needs a non-empty string value")
+                if v.strip() == INVALID_CATEGORICAL_PLACEHOLDER:
+                    raise ValueError(
+                        f"Option value {INVALID_CATEGORICAL_PLACEHOLDER!r} is reserved for the UI; "
+                        f"choose a different token for {attr_id!r}"
+                    )
                 if not isinstance(lb, str) or not lb.strip():
                     raise ValueError(f"Each categorical option for {attr_id!r} needs a non-empty string label")
                 parsed.append(CategoricalOption(value=v.strip(), label=lb.strip()))
@@ -119,22 +134,29 @@ def validate_profile(
         if spec.value_type == "categorical":
             if val == "":
                 raise ValueError(f"Missing value for {spec.label} ({spec.id})")
+            if val == INVALID_CATEGORICAL_PLACEHOLDER:
+                out[spec.id] = val
+                continue
             allowed = {o.value for o in spec.options}
             if val not in allowed:
                 raise ValueError(f"Invalid value for {spec.label}: {val!r}")
             out[spec.id] = val
             continue
 
+        if val == INVALID_NUMERICAL_PLACEHOLDER:
+            out[spec.id] = val
+            continue
         if val == "":
-            raise ValueError(f"Missing value for {spec.label} ({spec.id})")
+            out[spec.id] = INVALID_NUMERICAL_PLACEHOLDER
+            continue
         try:
             num = float(val)
-        except ValueError as exc:
-            raise ValueError(f"{spec.label} must be a number, got {val!r}") from exc
-        if not math.isfinite(num):
-            raise ValueError(f"{spec.label} must be a finite number")
-        if num < 0:
-            raise ValueError(f"{spec.label} must be zero or greater (non-negative)")
+        except ValueError:
+            out[spec.id] = INVALID_NUMERICAL_PLACEHOLDER
+            continue
+        if not math.isfinite(num) or num < 0:
+            out[spec.id] = INVALID_NUMERICAL_PLACEHOLDER
+            continue
         out[spec.id] = val
 
     return out
