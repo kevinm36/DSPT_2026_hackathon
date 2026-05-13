@@ -2,7 +2,7 @@
 
 ## Goal
 
-Build a Python web app where the user uploads up to five images and supplies a categorical customer profile (one dropdown per configured attribute). The backend runs a supervised model (stubbed until the real artifact is wired) and returns ranked scores plus per-image attributes and reasoning.
+Build a Python web app where the user uploads up to five images and supplies a customer profile (numerical fields plus grouped categorical dropdowns derived from the feature manifest). The backend runs a supervised model (stubbed until the real artifact is wired) and returns ranked scores plus per-image attributes and reasoning.
 
 ## Stack
 
@@ -14,15 +14,15 @@ Build a Python web app where the user uploads up to five images and supplies a c
 
 1. **Start page** (`GET /`) — one classic HTML form (`POST /results`, multipart) wrapping both tabs.
 2. **Tab: Images** — up to five file inputs; server enforces at most five files and allowed image MIME types.
-3. **Tab: Customer profile** — one `<select>` per categorical attribute, or optional one-row CSV (**CSV overrides** dropdowns when valid).
+3. **Tab: Customer profile** — **Information** (`inf__…`) and **Preference** (`pref__…`) sections: number inputs for numerical manifest columns, one dropdown per categorical **group** (shared `type__attribute_name`), plus optional one-row CSV (**CSV overrides** the form when valid).
 4. **Predict** — full-page submit to `POST /results`; on success the server **redirects** (`303`) to `GET /results/view?rid=…` with ranked thumbnails. On validation failure, `submit_error.html` is returned (`200`).
 5. **Results page** (`GET /results/view`) — thumbnails sorted by score (rank #1 first). Clicking a thumbnail loads `GET /results/partials/detail/{rid}/{slot}` into `#detail-slot` (HTMX partial): model image attributes + prediction reason.
 
 ## Data contract
 
-- **Multipart form** — files under `images` (repeatable, max five). Profile fields named by each attribute `id` in `profile_attributes.json`, or `profile_csv` file.
-- **CSV** — header row exactly matching attribute ids; one body row (first row used if multiple).
-- **Vocabulary** — `profile_attributes.json` lists each attribute’s `id`, `label`, and `options`.
+- **Multipart form** — files under `images` (repeatable, max five). Profile fields use each attribute `id` from `profile_attributes.json` (numerical and categorical), or `profile_csv` file.
+- **CSV** — header row exactly matching attribute `id` values in order; one body row. Numerical cells are numbers; categorical cells must be one of the full multihot column strings allowed for that grouped attribute.
+- **Vocabulary** — `profile_attributes.json` is built from `user_features_manifest.json` by `scripts/build_profile_attributes.py`. Each entry has `kind` (`information` / `preference`), `value_type` (`numerical` / `categorical`), `label`, and for categorical attributes a non-empty `options` list (full `type__name__value` tokens).
 - **Results cache** — after a successful run, payload is stored in memory (`services/results_cache.py`) under a UUID `rid` (TTL ~1 hour, capped entries). Thumbnails use `data:` URLs built at submit time.
 
 ## Backend modules
@@ -34,6 +34,7 @@ Build a Python web app where the user uploads up to five images and supplies a c
 | `services/submission.py` | Shared parsing/validation for images + profile. |
 | `services/results_cache.py` | In-memory store for result payloads keyed by `rid`. |
 | `services/vocab.py` | Load and validate profile against JSON vocabulary. |
+| `scripts/build_profile_attributes.py` | Regenerates `profile_attributes.json` and `sample_valid_profile.csv` from `user_features_manifest.json`. |
 | `services/model_service.py` | `stub_predict` — scores, reasons, and stub **image attributes** per slot. |
 | `templates/results.html` | Ranked gallery + `#detail-slot`. |
 | `templates/partials/image_detail.html` | HTMX fragment for one image. |
@@ -46,7 +47,7 @@ Build a Python web app where the user uploads up to five images and supplies a c
 
 ## Security notes
 
-- Server-side validation of every categorical value against the vocabulary file.
+- Server-side validation of numerical (finite floats) and categorical (allowed option tokens) values from `profile_attributes.json`.
 - Escape dynamic text in Jinja (default for `{{ }}`).
 - Result cache is process-local and time-bounded; do not rely on it for sensitive persistence.
 
