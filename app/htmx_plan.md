@@ -2,52 +2,54 @@
 
 ## Goal
 
-Build a Python web app where the user uploads up to five images and supplies a categorical customer profile (one dropdown per configured attribute). The backend runs a supervised model (stubbed until the real artifact is wired) and returns an affinity score and short reason per image, ranked for display.
+Build a Python web app where the user uploads up to five images and supplies a customer profile (numerical fields plus grouped categorical dropdowns derived from the feature manifest). The backend runs a supervised model (stubbed until the real artifact is wired) and returns ranked scores plus per-image attributes and reasoning.
 
 ## Stack
 
 - **FastAPI** — routing, multipart uploads, validation.
-- **Jinja2** — HTML shell, tabs, and **HTML partials** returned to HTMX.
-- **HTMX** — `POST /predict` swaps the `#results` region with a fragment (no SPA build step).
-
-Django remains a valid alternative; this package uses FastAPI for a smaller, hackathon-friendly surface.
+- **Jinja2** — HTML shell and partials.
+- **HTMX** — on the **results page**, each thumbnail uses `hx-get` to load a detail fragment (image attributes + reasoning) into `#detail-slot`.
 
 ## Layout
 
-1. **Start page** (`GET /`) — one form wrapping both tabs so a single submit serializes images and profile fields.
-2. **Tab: Images** — up to five file inputs (`Browse`); server enforces at most five files and allowed image MIME types.
-3. **Tab: Customer profile** — one `<select>` per categorical attribute. Optional one-row CSV upload whose columns match the configured attribute ids. If both CSV and dropdowns are present, **CSV wins** after successful parse; otherwise dropdown values are used.
-4. **Predict** — submits the form via HTMX to `POST /predict`; response is **only** the inner HTML for `#results` (success table or error alert).
-5. **Results** — per image: rank, filename, affinity (float), reason (text). Rows sorted by affinity descending.
+1. **Start page** (`GET /`) — one classic HTML form (`POST /results`, multipart) wrapping both tabs.
+2. **Tab: Images** — up to five file inputs; server enforces at most five files and allowed image MIME types.
+3. **Tab: Customer profile** — **Information** (`inf__…`) and **Preference** (`pref__…`) sections: number inputs for numerical manifest columns, one dropdown per categorical **group** (shared `type__attribute_name`), plus optional one-row CSV (**CSV overrides** the form when valid).
+4. **Predict** — full-page submit to `POST /results`; on success the server **redirects** (`303`) to `GET /results/view?rid=…` with ranked thumbnails. On validation failure, `submit_error.html` is returned (`200`).
+5. **Results page** (`GET /results/view`) — thumbnails sorted by score (rank #1 first). Clicking a thumbnail loads `GET /results/partials/detail/{rid}/{slot}` into `#detail-slot` (HTMX partial): model image attributes + prediction reason.
 
 ## Data contract
 
-- **Multipart form** — files under field name `images` (repeatable, max five). Profile fields named by each attribute `id` in `profile_attributes.json`, or `profile_csv` file.
-- **CSV** — header row with column names exactly matching attribute ids in `profile_attributes.json`; one body row (first row used if multiple).
-- **Vocabulary** — `profile_attributes.json` lists each attribute’s `id`, human `label`, and allowed `options`. Replace this file when real names and categories are ready; no code change required if the schema stays the same.
+- **Multipart form** — files under `images` (repeatable, max five). Profile fields use each attribute `id` from `profile_attributes.json` (numerical and categorical), or `profile_csv` file.
+- **CSV** — header row exactly matching attribute `id` values in order; one body row. Numerical cells are numbers; categorical cells must be one of the full multihot column strings allowed for that grouped attribute.
+- **Vocabulary** — `profile_attributes.json` is built from `user_features_manifest.json` by `scripts/build_profile_attributes.py`. Each entry has `kind` (`information` / `preference`), `value_type` (`numerical` / `categorical`), `label`, and for categorical attributes a non-empty `options` list (full `type__name__value` tokens).
+- **Results cache** — after a successful run, payload is stored in memory (`services/results_cache.py`) under a UUID `rid` (TTL ~1 hour, capped entries). Thumbnails use `data:` URLs built at submit time.
 
 ## Backend modules
 
 | Path | Role |
 |------|------|
-| `main.py` | App factory, static files, templates, router include, lifespan hooks if needed later for model load. |
-| `routers/web.py` | `GET /`, `POST /predict`, `GET /profile/csv-template` (downloadable template). |
+| `main.py` | App factory, static files, router include. |
+| `routers/web.py` | `GET /`, `POST /results`, `GET /results/view`, `GET /results/partials/detail/{rid}/{slot}`, `GET /profile/csv-template`. |
+| `services/submission.py` | Shared parsing/validation for images + profile. |
+| `services/results_cache.py` | In-memory store for result payloads keyed by `rid`. |
 | `services/vocab.py` | Load and validate profile against JSON vocabulary. |
-| `services/model_service.py` | `predict(...)` — currently a **stub** returning deterministic placeholder scores and reasons. |
-| `templates/` | `base.html`, `index.html`, `partials/results.html`, `partials/results_error.html`. |
-| `static/style.css` | Layout and tabs. |
+| `scripts/build_profile_attributes.py` | Regenerates `profile_attributes.json` and `sample_valid_profile.csv` from `user_features_manifest.json`. |
+| `services/model_service.py` | `stub_predict` — scores, reasons, and stub **image attributes** per slot. |
+| `templates/results.html` | Ranked gallery + `#detail-slot`. |
+| `templates/partials/image_detail.html` | HTMX fragment for one image. |
+| `static/style.css` | Gallery, active thumb, detail panel. |
 
 ## HTMX behavior
 
-- Root `<form>` uses `hx-post="/predict"`, `hx-target="#results"`, `hx-swap="innerHTML"`, `enctype="multipart/form-data"`.
-- Predict control is `type="submit"` inside the form so files and fields post together.
-- Validation and stub errors return **HTTP 200** with `partials/results_error.html` so HTMX always swaps `#results` without extra `hx-on::` error handling.
+- **Results page** only: each `.result-thumb` has `hx-get`, `hx-target="#detail-slot"`, `hx-swap="innerHTML"`.
+- Small script marks `.is-active` on the selected thumb on `htmx:beforeRequest`.
 
 ## Security notes
 
-- Server-side validation of every categorical value against the vocabulary file.
-- Escape all dynamic text in Jinja (`{{ x | e }}` is default for variables).
-- Enforce upload size limits in FastAPI / Starlette configuration when deploying.
+- Server-side validation of numerical (finite floats) and categorical (allowed option tokens) values from `profile_attributes.json`.
+- Escape dynamic text in Jinja (default for `{{ }}`).
+- Result cache is process-local and time-bounded; do not rely on it for sensitive persistence.
 
 ## Run locally (Conda)
 
@@ -73,8 +75,8 @@ Open `http://127.0.0.1:8000/`.
 
 ## Replacing placeholder profile metadata
 
-Edit `profile_attributes.json`: set real `label` strings, `id` keys (used as form field names and CSV headers), and full `options` lists per attribute. Keep the `attributes` array in sync with your model features; length is not hard-coded in Python beyond requiring at least one attribute.
+Edit `profile_attributes.json`: set real `label` strings, `id` keys, and `options` lists. Keep the `attributes` array in sync with your model features.
 
 ## Replacing the stub model
 
-Implement loading your trained artifact inside `services/model_service.py` (for example load the artifact in a FastAPI lifespan handler and store it on the application instance’s `.state`) and replace `stub_predict` with calls into your pipeline. Keep the return shape: list of objects with `filename`, `affinity`, `reason`, sorted by descending affinity.
+Extend `services/model_service.py` so the real model returns, per image slot: `affinity`, `reason`, and `image_attributes` (dict of categorical outputs). `routers/web.py` maps those into the cache payload consumed by `results.html` and `partials/image_detail.html`.

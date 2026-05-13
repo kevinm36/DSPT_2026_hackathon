@@ -3,11 +3,9 @@
   <form
     id="main-form"
     class="card"
-    hx-post="/predict"
-    hx-target="#results"
-    hx-swap="innerHTML"
+    action="/results"
+    method="post"
     enctype="multipart/form-data"
-    hx-indicator="#predict-spinner"
   >
     <div class="tabs" role="tablist" aria-label="Input sections">
       <button type="button" class="tab is-active" data-tab-target="images" role="tab" aria-selected="true">
@@ -34,8 +32,10 @@
     <section id="panel-profile" class="tab-panel" role="tabpanel" hidden>
       <h2 class="panel-title">Customer profile</h2>
       <p class="hint">
-        Choose one value per attribute, or upload a single-row UTF-8 CSV whose headers match
-        <a href="/profile/csv-template">this template</a>. If a CSV is attached, it overrides the dropdowns.
+        Use <strong>Information</strong> fields (prefix <code>inf</code>) and <strong>Preference</strong> fields (prefix <code>pref</code>).
+        Enter numbers where required, or choose one option per categorical dropdown (each option is a full
+        <code>type__name__value</code> token from the feature manifest). You can instead upload a single-row UTF-8 CSV
+        whose headers match <a href="/profile/csv-template">this template</a> (see <code>app/sample_valid_profile.csv</code> for an example). If a CSV is attached, it overrides the form.
       </p>
 
       <div class="profile-csv">
@@ -43,31 +43,63 @@
         <input id="profile_csv" type="file" name="profile_csv" accept=".csv,text/csv" />
       </div>
 
+      <h3 class="profile-section-title">Information</h3>
+      <p class="hint subsection">Demographics and related inputs (<code>inf__…</code>).</p>
       <div class="profile-grid">
-        {% for attr in attributes %}
+        {% for attr in attributes_information %}
           <div class="field">
-            <label for="{{ attr.id }}">{{ attr.label }}</label>
-            <select id="{{ attr.id }}" name="{{ attr.id }}">
-              <option value="" disabled selected hidden>Choose…</option>
-              {% for opt in attr.options %}
-                <option value="{{ opt }}">{{ opt }}</option>
-              {% endfor %}
-            </select>
+            <label for="{{ attr.id }}">{{ attr.label }} <span class="mono-id">({{ attr.id }})</span></label>
+            {% if attr.value_type == "numerical" %}
+              <input
+                id="{{ attr.id }}"
+                name="{{ attr.id }}"
+                type="number"
+                step="any"
+                inputmode="decimal"
+                value="0"
+              />
+            {% else %}
+              <select id="{{ attr.id }}" name="{{ attr.id }}">
+                {% for opt in attr.options %}
+                  <option value="{{ opt }}"{% if loop.first %} selected{% endif %}>{{ opt.split('__')[-1] | replace('_', ' ') }}</option>
+                {% endfor %}
+              </select>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+
+      <h3 class="profile-section-title">Preference</h3>
+      <p class="hint subsection">Tastes and media preferences (<code>pref__…</code>).</p>
+      <div class="profile-grid">
+        {% for attr in attributes_preference %}
+          <div class="field">
+            <label for="{{ attr.id }}">{{ attr.label }} <span class="mono-id">({{ attr.id }})</span></label>
+            {% if attr.value_type == "numerical" %}
+              <input
+                id="{{ attr.id }}"
+                name="{{ attr.id }}"
+                type="number"
+                step="any"
+                inputmode="decimal"
+                value="0"
+              />
+            {% else %}
+              <select id="{{ attr.id }}" name="{{ attr.id }}">
+                {% for opt in attr.options %}
+                  <option value="{{ opt }}"{% if loop.first %} selected{% endif %}>{{ opt.split('__')[-1] | replace('_', ' ') }}</option>
+                {% endfor %}
+              </select>
+            {% endif %}
           </div>
         {% endfor %}
       </div>
     </section>
 
     <div class="form-actions">
-      <button type="submit" class="btn primary" hx-disabled-elt="this">Predict</button>
-      <span id="predict-spinner" class="htmx-indicator muted">Running prediction…</span>
+      <button type="submit" class="btn primary">Predict</button>
     </div>
   </form>
-
-  <section id="results" class="results-host card" aria-live="polite">
-    <h2 class="panel-title">Results</h2>
-    <p class="muted">Submit the form to see ranked affinity scores here.</p>
-  </section>
 
   <script>
     (function () {
