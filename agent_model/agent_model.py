@@ -1,11 +1,16 @@
 """
 AgentModel — calls the deployed image ranking agent on Bedrock AgentCore.
 
-Usage:
-    from app.services.model_service import set_model
-    from app.services.agent_model import AgentModel
+Subclasses CustomInferenceInterface from app.services.model_service so it can
+be used as a drop-in replacement for the stub.
 
-    set_model(AgentModel(agent_arn="arn:aws:bedrock-agentcore:..."))
+Usage:
+    from app.services.model_service import default_agent_model
+    from agent_model.agent_model import AgentModel
+
+    # Replace the default stub with the real agent
+    import app.services.model_service as ms
+    ms.default_agent_model = AgentModel(agent_arn="arn:aws:bedrock-agentcore:...")
 """
 
 from __future__ import annotations
@@ -17,12 +22,12 @@ from pathlib import Path
 
 import boto3
 
-from app.services.model_service import BaseModel, ImagePrediction
+from app.services.model_service import CustomInferenceInterface, ImagePrediction
 
-_REPO_ROOT = Path(__file__).resolve().parents[2]
+_REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
-class AgentModel(BaseModel):
+class AgentModel(CustomInferenceInterface):
     """Calls the deployed image ranking agent to classify and score ads."""
 
     def __init__(self, agent_arn: str | None = None, region: str | None = None):
@@ -112,8 +117,8 @@ class AgentModel(BaseModel):
             })
         return images
 
-    @staticmethod
     def _parse_response(
+        self,
         result: dict,
         image_payloads: list[tuple[str, bytes]],
     ) -> list[ImagePrediction]:
@@ -121,17 +126,22 @@ class AgentModel(BaseModel):
         scores_by_id = {s["image_id"]: s for s in result.get("scores", [])}
 
         predictions = []
-        for filename, _ in image_payloads:
+        for slot_index, (filename, blob) in enumerate(image_payloads):
             score_info = scores_by_id.get(filename, {})
             class_info = classifications.get(filename, {})
             # Normalize score from [-1, 1] to [0, 1]
             raw_score = score_info.get("score", 0.0)
             affinity = (raw_score + 1) / 2.0
             predictions.append(ImagePrediction(
+                slot_index=slot_index,
                 filename=filename,
                 affinity=affinity,
                 reason=score_info.get("reasoning", "No reasoning provided"),
-                category=class_info.get("category", "Unknown"),
+                image_attributes={
+                    "ad_category": class_info.get("category", "Unknown"),
+                    "classification_confidence": str(class_info.get("confidence", 0.0)),
+                    **self._get_image_attributes(blob),
+                },
             ))
 
         predictions.sort(key=lambda p: p.affinity, reverse=True)
