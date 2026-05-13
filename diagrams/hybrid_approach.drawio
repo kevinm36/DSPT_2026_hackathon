@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" modified="2026-05-13T00:00:00.000Z" agent="Kiro" version="21.0.0">
+  <diagram name="Hybrid Approach" id="hybrid-approach">
+    <mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="850" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- Title -->
+        <mxCell id="title" value="Hybrid Ranking: Trained Model + LLM Agent" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=18;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="300" y="20" width="500" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- User Input Box -->
+        <mxCell id="input" value="&lt;b&gt;User Input&lt;/b&gt;&lt;br&gt;Profile (demographics, preferences)&lt;br&gt;+ Candidate Ad Images" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="370" y="80" width="360" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- Arrow from input to Signal A -->
+        <mxCell id="arrow1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;exitX=0.25;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="input" target="signalA">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow1_label" value="structured features" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;fontColor=#666666;" vertex="1" connectable="0" parent="arrow1">
+          <mxGeometry x="-0.2" relative="1" as="geometry">
+            <mxPoint x="-30" as="offset" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Arrow from input to Signal B -->
+        <mxCell id="arrow2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;exitX=0.75;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="input" target="signalB">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow2_label" value="images + profile text" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;fontColor=#666666;" vertex="1" connectable="0" parent="arrow2">
+          <mxGeometry x="-0.2" relative="1" as="geometry">
+            <mxPoint x="30" as="offset" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Signal A: Trained Model -->
+        <mxCell id="signalA" value="&lt;b&gt;Signal A: Trained Model&lt;/b&gt;&lt;br&gt;&lt;br&gt;sklearn bundle (LR / Ridge / kNN)&lt;br&gt;trained on 120 users' real ratings&lt;br&gt;&lt;br&gt;&lt;i&gt;src/model/loader.py&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="140" y="220" width="280" height="120" as="geometry" />
+        </mxCell>
+
+        <!-- Signal B: LLM Ranking Agent -->
+        <mxCell id="signalB" value="&lt;b&gt;Signal B: LLM Ranking Agent&lt;/b&gt;&lt;br&gt;&lt;br&gt;AgentCore runtime (Claude Sonnet)&lt;br&gt;1. Classify image → IAB category&lt;br&gt;2. Score category vs user profile&lt;br&gt;&lt;br&gt;&lt;i&gt;image_ranking_agent_src/&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="680" y="220" width="280" height="120" as="geometry" />
+        </mxCell>
+
+        <!-- Signal A output -->
+        <mxCell id="outputA" value="Per-category scores&lt;br&gt;&lt;font color=&quot;#666666&quot; style=&quot;font-size:10px&quot;&gt;P(user likes category)&lt;br&gt;calibrated, deterministic&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="180" y="400" width="200" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Signal B output -->
+        <mxCell id="outputB" value="Per-image score + reasoning&lt;br&gt;&lt;font color=&quot;#666666&quot; style=&quot;font-size:10px&quot;&gt;visual context, explanations&lt;br&gt;handles novel combinations&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="720" y="400" width="200" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Arrow Signal A to output A -->
+        <mxCell id="arrow3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" parent="1" source="signalA" target="outputA">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Arrow Signal B to output B -->
+        <mxCell id="arrow4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" parent="1" source="signalB" target="outputB">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Fusion Box -->
+        <mxCell id="fusion" value="&lt;b&gt;Fusion&lt;/b&gt;&lt;br&gt;&lt;br&gt;Model score anchors the prediction (prior)&lt;br&gt;Agent score adjusts based on visual context" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="350" y="530" width="400" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- Arrow output A to fusion -->
+        <mxCell id="arrow5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;entryX=0.25;entryY=0;" edge="1" parent="1" source="outputA" target="fusion">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Arrow output B to fusion -->
+        <mxCell id="arrow6" style="edgeStyle=orthogonalEdgeStyle;rounded=1;entryX=0.75;entryY=0;" edge="1" parent="1" source="outputB" target="fusion">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Final Output -->
+        <mxCell id="output" value="&lt;b&gt;Ranked Ads&lt;/b&gt;&lt;br&gt;Combined affinity score + explanation per image" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=13;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="400" y="670" width="300" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Arrow fusion to output -->
+        <mxCell id="arrow7" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" parent="1" source="fusion" target="output">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Annotations on left -->
+        <mxCell id="noteA" value="✓ Grounded in real data&lt;br&gt;✓ Fast &amp; deterministic&lt;br&gt;✓ Calibrated scores&lt;br&gt;✗ Can't see the image" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=10;fontColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="140" y="350" width="140" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- Annotations on right -->
+        <mxCell id="noteB" value="✓ Sees the actual image&lt;br&gt;✓ Reasons about context&lt;br&gt;✓ Provides explanations&lt;br&gt;✗ Expensive &amp; stochastic" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=10;fontColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="820" y="350" width="150" height="70" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

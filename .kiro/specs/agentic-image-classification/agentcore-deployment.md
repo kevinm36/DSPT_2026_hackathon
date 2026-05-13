@@ -223,21 +223,30 @@ print(f"Response: {body}")
 # Output: {"message": "Hello YourName! AgentCore is working."}
 ```
 
-## Batch Classification Script (Next Step)
+## Batch Classification Script (Implemented)
 
-Once the hello world validates your setup, the real classifier uses the same pattern:
+The batch classifier uses the same AgentCore pattern as the hello world:
 
 ```bash
-python -m src.pipeline.run_classification \
-    --runtime-arn arn:aws:bedrock-agentcore:us-east-1:014498646416:runtime/image_classifier-XXXXX \
-    --archive-root archive/ADS16_Benchmark_part1/ADS16_Benchmark_part1 \
-    --output-dir data/output
+python -m src.data_loader.agent_processing.batch_invoke_ads \
+    --agent-arn arn:aws:bedrock-agentcore:us-east-1:014498646416:runtime/image_classifier-XXXXX \
+    --ads-root archive/ADS16_Benchmark_part1/ADS16_Benchmark_part1 \
+    --output data/ads16_agent_responses.jsonl \
+    --max-workers 8
 ```
 
-This script (to be built) will:
-1. Discover all 1,500 images (300 ads + 1,200 personal)
-2. Send each to the classifier runtime with the IAB taxonomy
-3. Collect results and assemble the multi-hot CSVs
+This script:
+1. Discovers all PNG images under `--ads-root`
+2. Base64-encodes each image and sends it to the classifier runtime with the IAB taxonomy prompt
+3. Writes results to a resumable JSONL file (skips already-processed images on restart)
+4. Runs with configurable concurrency via `--max-workers`
+
+Post-processing into multi-hot CSVs:
+```bash
+python -m src.data_loader.multihot_from_responses \
+    --responses data/ads16_agent_responses.jsonl \
+    --output data/ads16_multihot.csv
+```
 
 ## Troubleshooting
 
@@ -258,3 +267,55 @@ Agents are created programmatically. This means:
 - Multiple agents can run in parallel for throughput
 - The same pattern works for the LLM ranking agent in Stage 2
 - One S3 bucket serves all agents (different keys per agent)
+
+## Reusable Deployment Utility (`src/agentcore/deploy.py`)
+
+The hello world script demonstrates the raw boto3 workflow. For production use, the project provides a higher-level utility that wraps the full lifecycle:
+
+```python
+from src.agentcore.deploy import deploy_agent, invoke_agent, delete_agent
+
+# Deploy with a system prompt (auto-generates agent code)
+runtime = deploy_agent(
+    name="image_classifier",
+    system_prompt="You classify images into IAB categories...",
+    model_id="arn:aws:bedrock:us-east-1:...",
+)
+
+# Deploy with custom handler code
+runtime = deploy_agent(
+    name="image_ranking_agent",
+    handler_code=open("image_ranking_agent_src/image_ranking_agent.py").read(),
+)
+
+# Invoke
+result = invoke_agent(runtime["arn"], {"prompt": "...", "image_base64": "..."})
+
+# Delete
+delete_agent("image_classifier")
+```
+
+### Features
+
+- **Create or update** — if a runtime with the same name exists, it updates rather than failing
+- **Auto-packaging** — bundles code + pip dependencies into a zip for `manylinux2014_aarch64` / Python 3.12
+- **Config from env** — reads `config/agentcore.env` for bucket, role, region, model ID
+- **Wait for ready** — polls until the runtime reaches ACTIVE/READY status
+- **Custom code support** — pass `handler_code` to deploy arbitrary agent logic
+
+### Deployment Scripts
+
+| Script | What it deploys | Runtime name |
+|--------|----------------|--------------|
+| `scripts/deploy_hello_world.py` | Minimal echo agent (validates setup) | `hello_world_test` |
+| `scripts/deploy_image_ranking.py` | Full ranking agent from `image_ranking_agent_src/` | `image_ranking_agent` |
+
+### Testing
+
+```bash
+# Test the deploy utility end-to-end
+python tests/test_deploy.py
+
+# Leave runtime running for manual testing
+python tests/test_deploy.py --no-cleanup
+```
