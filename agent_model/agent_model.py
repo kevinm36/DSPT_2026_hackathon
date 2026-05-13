@@ -84,21 +84,36 @@ class AgentModel(CustomInferenceInterface):
 
     @staticmethod
     def _build_agent_profile(profile: dict[str, str]) -> dict:
+        """Map UI form field IDs to the agent's expected profile format."""
+
+        def _label_from_value(val: str) -> str:
+            """Extract human-readable label from encoded value.
+            e.g. 'pref__most_visited_websites__jewellery_watches_sites'
+                 -> 'jewellery watches sites'
+            """
+            if not val:
+                return ""
+            parts = val.split("__")
+            return parts[-1].replace("_", " ") if len(parts) > 1 else val
+
+        gender_val = profile.get("inf__gender_male", "")
+        gender = "M" if gender_val == "1" else "F" if gender_val == "0" else ""
+
         return {
             "inf": {
-                "gender": profile.get("gender", profile.get("attribute_1", "")),
-                "age": profile.get("age", profile.get("attribute_2", "")),
-                "job": profile.get("job", profile.get("attribute_3", "")),
-                "income": profile.get("income", profile.get("attribute_4", "")),
-                "timepass": profile.get("timepass", profile.get("attribute_5", "")),
-                "fave_sports": profile.get("fave_sports", profile.get("attribute_6", "")),
+                "gender": gender,
+                "age": profile.get("inf__age", ""),
+                "job": "",
+                "income": profile.get("inf__income", ""),
+                "timepass": "",
+                "fave_sports": _label_from_value(profile.get("inf__fave_sports", "")),
             },
             "pref": {
-                "websites": profile.get("websites", profile.get("attribute_7", "")),
-                "music": profile.get("music", profile.get("attribute_8", "")),
-                "movies": profile.get("movies", profile.get("attribute_9", "")),
-                "tv": profile.get("tv", profile.get("attribute_10", "")),
-                "books": profile.get("books", ""),
+                "websites": _label_from_value(profile.get("pref__most_visited_websites", "")),
+                "music": _label_from_value(profile.get("pref__most_listened_musics", "")),
+                "movies": _label_from_value(profile.get("pref__most_watched_movies", "")),
+                "tv": _label_from_value(profile.get("pref__most_watched_tv_programmes", "")),
+                "books": _label_from_value(profile.get("pref__most_read_books", "")),
             },
             "pos_labels": [],
             "neg_labels": [],
