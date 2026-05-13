@@ -6,15 +6,17 @@ The angle (vs. IAB content categorization): instead of "what topic is this ad ab
 
 ## Pipeline at a glance
 
-| # | Step | What it does | Time | Output |
-|---|---|---|---|---|
-| 1 | Inspect schema | Eyeball the 20 fields and rubrics | seconds | (read-only) |
-| 2 | Eyeball prompt | See exactly what gets sent to the LLM | seconds | (read-only) |
-| 3 | Automated test-retest | Score 20 ads twice, compute per-field agreement | ~5 min, ~40 LLM calls | `Data/ads16_design_features_consistency.csv` |
-| 4 | **Human spot-check** | Manually review the test-retest output for plausibility | ~10 min, no LLM calls | (judgment call) |
-| 5 | Score the corpus | Run on all 300 ads | ~20-40 min, 300 LLM calls | `Data/ads16_design_features.jsonl` |
-| 6 | Flatten to CSV | Validate + flatten responses | seconds | `Data/ads16_design_features.csv` |
-| 7 | Use in modeling | Join to user features for the recommender | n/a | downstream |
+
+| #   | Step                  | What it does                                            | Time                      | Output                                       |
+| --- | --------------------- | ------------------------------------------------------- | ------------------------- | -------------------------------------------- |
+| 1   | Inspect schema        | Eyeball the 20 fields and rubrics                       | seconds                   | (read-only)                                  |
+| 2   | Eyeball prompt        | See exactly what gets sent to the LLM                   | seconds                   | (read-only)                                  |
+| 3   | Automated test-retest | Score 20 ads twice, compute per-field agreement         | ~5 min, ~40 LLM calls     | `Data/ads16_design_features_consistency.csv` |
+| 4   | **Human spot-check**  | Manually review the test-retest output for plausibility | ~10 min, no LLM calls     | (judgment call)                              |
+| 5   | Score the corpus      | Run on all 300 ads                                      | ~20-40 min, 300 LLM calls | `Data/ads16_design_features.jsonl`           |
+| 6   | Flatten to CSV        | Validate + flatten responses                            | seconds                   | `Data/ads16_design_features.csv`             |
+| 7   | Use in modeling       | Join to user features for the recommender               | n/a                       | downstream                                   |
+
 
 Steps 3 and 4 are **gates**. If automated agreement is poor or human spot-check flags issues, fix the prompt/schema in `src/ad_design/{schema,prompt}.py` and re-run before scaling to 300 ads.
 
@@ -22,7 +24,7 @@ Steps 3 and 4 are **gates**. If automated agreement is poor or human spot-check 
 
 ## Step 1 — Inspect the schema
 
-The schema is defined once in [`src/ad_design/schema.py`](../src/ad_design/schema.py) (20 fields with types, ranges, enum values, and rubric anchors).
+The schema is defined once in `[src/ad_design/schema.py](../src/ad_design/schema.py)` (20 fields with types, ranges, enum values, and rubric anchors).
 
 ```bash
 python -c "from src.ad_design.schema import FIELD_NAMES; \
@@ -32,14 +34,16 @@ print(len(FIELD_NAMES), 'fields:'); \
 
 20 fields, in 5 logical groups:
 
-| Group | Fields |
-|---|---|
+
+| Group              | Fields                                                                                                |
+| ------------------ | ----------------------------------------------------------------------------------------------------- |
 | Visual composition | `design_quality`, `visual_clutter`, `focal_point_presence`, `contrast_level`, `visual_saliency_score` |
-| Subject | `primary_subject_type`, `human_presence` |
-| Product / brand | `product_visibility`, `usage_context`, `brand_prominence`, `logo_present` |
-| Text | `word_count_bin`, `text_density`, `readability` |
-| Messaging | `value_proposition_present`, `cta_present`, `offer_present` |
-| Emotion / trust | `emotion_valence`, `perceived_credibility`, `spamminess` |
+| Subject            | `primary_subject_type`, `human_presence`                                                              |
+| Product / brand    | `product_visibility`, `usage_context`, `brand_prominence`, `logo_present`                             |
+| Text               | `word_count_bin`, `text_density`, `readability`                                                       |
+| Messaging          | `value_proposition_present`, `cta_present`, `offer_present`                                           |
+| Emotion / trust    | `emotion_valence`, `perceived_credibility`, `spamminess`                                              |
+
 
 **Refinements vs. the original 20-field draft:**
 
@@ -90,16 +94,18 @@ What it does:
 1. Picks 20 images deterministically, stratified across all 20 ADS-16 category folders
 2. Scores each one twice in two independent calls (≈40 LLM calls total)
 3. Per field, computes agreement between pass 1 and pass 2:
-   - **Numeric (1-10) fields**: Pearson + Spearman correlation, mean absolute diff
-   - **Boolean / enum fields**: Cohen's kappa, raw accuracy
+  - **Numeric (1-10) fields**: Pearson + Spearman correlation, mean absolute diff
+  - **Boolean / enum fields**: Cohen's kappa, raw accuracy
 4. Prints a per-field report and writes `Data/ads16_design_features_consistency.csv`
 
 Verdict thresholds (auto-applied):
 
-| Field type | excellent | ok | weak (tighten rubric) | drop / recast |
-|---|---|---|---|---|
-| numeric (Pearson) | ≥ 0.85 | 0.70-0.85 | 0.50-0.70 | < 0.50 |
-| categorical (κ) | ≥ 0.81 | 0.61-0.81 | 0.41-0.61 | < 0.41 |
+
+| Field type        | excellent | ok        | weak (tighten rubric) | drop / recast |
+| ----------------- | --------- | --------- | --------------------- | ------------- |
+| numeric (Pearson) | ≥ 0.85    | 0.70-0.85 | 0.50-0.70             | < 0.50        |
+| categorical (κ)   | ≥ 0.81    | 0.61-0.81 | 0.41-0.61             | < 0.41        |
+
 
 Example output (illustrative — your numbers will differ):
 
@@ -139,15 +145,18 @@ for r in recs[:5]:
 
 Open the image at the printed path next to the LLM's JSON output. For each row, ask:
 
-| Check | Pass criterion |
-|---|---|
-| Subject correctness | Does `primary_subject_type` match what's actually shown? |
-| Brand correctness | Is `logo_present` correct? Does `brand_prominence` reflect actual emphasis? |
-| Text correctness | Is `word_count_bin` plausible? Does `cta_present` match? |
-| Emotion sanity | Does `emotion_valence` feel right looking at the image? |
-| Clutter calibration | Does the LLM's `visual_clutter` of "5" look like a 5 to you, or like a 7? |
+
+| Check               | Pass criterion                                                              |
+| ------------------- | --------------------------------------------------------------------------- |
+| Subject correctness | Does `primary_subject_type` match what's actually shown?                    |
+| Brand correctness   | Is `logo_present` correct? Does `brand_prominence` reflect actual emphasis? |
+| Text correctness    | Is `word_count_bin` plausible? Does `cta_present` match?                    |
+| Emotion sanity      | Does `emotion_valence` feel right looking at the image?                     |
+| Clutter calibration | Does the LLM's `visual_clutter` of "5" look like a 5 to you, or like a 7?   |
+
 
 Reject the run and tighten the schema if you see:
+
 - Systematic miscalibration (everything is 7-8 on every scale)
 - Hallucinated fields (LLM invents categories not in the enum)
 - Disagreement with obvious facts (LLM says no logo when there's a clear logo)
@@ -165,6 +174,7 @@ python -m src.ad_design.extract
 ```
 
 Defaults:
+
 - All 300 images across **both** ADS-16 release parts (`ADS16_Benchmark_part1` + `ADS16_Benchmark_part2`)
 - Output: `Data/ads16_design_features.jsonl`
 - Resumable — safe to interrupt and re-run; already-processed paths are skipped
@@ -198,11 +208,13 @@ Reads the JSONL, extracts the JSON payload from each `<json>...</json>` block, v
 
 The parser also reports any rows that failed validation. Common failure modes:
 
-| Failure | Fix |
-|---|---|
-| `no JSON found in response` | LLM ignored the `<json>` tag instruction. Re-run that image. |
-| `<field>: <v> outside [1, 10]` | LLM emitted a 0 or 11. Re-run, or tighten rubric. |
-| `<field>: <v> not in [...]` | LLM hallucinated an enum value. Tighten prompt wording. |
+
+| Failure                        | Fix                                                          |
+| ------------------------------ | ------------------------------------------------------------ |
+| `no JSON found in response`    | LLM ignored the `<json>` tag instruction. Re-run that image. |
+| `<field>: <v> outside [1, 10]` | LLM emitted a 0 or 11. Re-run, or tighten rubric.            |
+| `<field>: <v> not in [...]`    | LLM hallucinated an enum value. Tighten prompt wording.      |
+
 
 To keep partial rows in the CSV (NaN for failed fields), pass `--include-errors`.
 
@@ -244,7 +256,8 @@ SERP listing".
 ### What gets sent to the LLM (same for both ads)
 
 A single payload:
-- `prompt`: the full prompt from [`build_prompt()`](../src/ad_design/prompt.py) (~60 lines, includes the schema + rubrics)
+
+- `prompt`: the full prompt from `[build_prompt()](../src/ad_design/prompt.py)` (~60 lines, includes the schema + rubrics)
 - `image_base64`: the PNG bytes, base64-encoded
 - `image_format`: `"png"` (sniffed from magic bytes — `extract.py` does NOT trust the file extension)
 - `temperature`: `0.0`
@@ -257,9 +270,10 @@ The LLM is expected to return only a `<json>...</json>` block matching the schem
 
 **Image**: `Data/ADS-16/ADS16_Benchmark_part2/ADS16_Benchmark_part2/Ads/Ads/13/8.png` → `image_id = 13_8`
 
-![A diamond engagement ring product ad with a prominent red discounted price and original price strikethrough](../Data/ADS-16/ADS16_Benchmark_part2/ADS16_Benchmark_part2/Ads/Ads/13/8.png)
+A diamond engagement ring product ad with a prominent red discounted price and original price strikethrough
 
 What's in the image:
+
 - Centered product photography of a princess-cut diamond ring on a white background
 - Product name "3/4 ct. Princess Cut Diamond Solitaire Engagement Ring in 18k White Gold"
 - Seller "by ND Outlet - Engagement"
@@ -303,9 +317,10 @@ Why these scores make sense: the ad has **clear product photography** (`product_
 
 **Image**: `Data/ADS-16/ADS16_Benchmark_part2/ADS16_Benchmark_part2/Ads/Ads/13/3.png` → `image_id = 13_3`
 
-![A plain text-only Google search-result-style ad for an Italian jewellery shop, with a small yellow Ad badge, blue headline, green URL, and a few short lines of body text and blue link sub-categories](../Data/ADS-16/ADS16_Benchmark_part2/ADS16_Benchmark_part2/Ads/Ads/13/3.png)
+A plain text-only Google search-result-style ad for an Italian jewellery shop, with a small yellow Ad badge, blue headline, green URL, and a few short lines of body text and blue link sub-categories
 
 What's in the image:
+
 - Small yellow `Ad` badge next to the green URL
 - Blue headline `Jewellery Shop - Contemporary Jewellery Online`
 - Green URL `www.alaricogentili.it`
@@ -348,10 +363,12 @@ Why these scores make sense: **no product imagery** (`product_visibility: 1`, `p
 
 ### Side-by-side: same product, different design
 
-| `image_id` | `design_quality` | `visual_clutter` | `primary_subject_type` | `product_visibility` | `offer_present` | `emotion_valence` | `perceived_credibility` |
-|---|---|---|---|---|---|---|---|
-| `13_8` (ring) | `high` | `2` | `product` | **`10`** | **`true`** | **`positive`** | **`high`** |
-| `13_3` (text) | `medium` | `2` | `text-only` | **`1`** | **`false`** | **`neutral`** | **`medium`** |
+
+| `image_id`    | `design_quality` | `visual_clutter` | `primary_subject_type` | `product_visibility` | `offer_present` | `emotion_valence` | `perceived_credibility` |
+| ------------- | ---------------- | ---------------- | ---------------------- | -------------------- | --------------- | ----------------- | ----------------------- |
+| `13_8` (ring) | `high`           | `2`              | `product`              | `**10`**             | `**true`**      | `**positive**`    | `**high**`              |
+| `13_3` (text) | `medium`         | `2`              | `text-only`            | `**1**`              | `**false**`     | `**neutral**`     | `**medium**`            |
+
 
 Both ads sell jewelry. Both have low `visual_clutter` — but the ring scores `2` because it's a clean *product photo*, while the text ad scores `2` because it's *sparse text*. That's exactly why the schema needs more than one dimension: `clutter` alone can't separate "minimalist product ad" from "barebones search listing". You need `clutter` + `product_visibility` + `primary_subject_type` together.
 
@@ -374,30 +391,32 @@ ads.loc[["13_8", "13_3"]].T   # side-by-side comparison
 
 ## Schema reference
 
-Full type / range / rubric per field is the source of truth in [`src/ad_design/schema.py`](../src/ad_design/schema.py). Quick summary:
+Full type / range / rubric per field is the source of truth in `[src/ad_design/schema.py](../src/ad_design/schema.py)`. Quick summary:
 
-| Field | Type | Range / values |
-|---|---|---|
-| `design_quality` | enum | `low` / `medium` / `high` |
-| `visual_clutter` | int | 1-10 |
-| `focal_point_presence` | int | 1-10 |
-| `contrast_level` | int | 1-10 |
-| `visual_saliency_score` | int | 1-10 |
-| `primary_subject_type` | enum | `product` / `person` / `scene` / `text-only` / `mixed` |
-| `human_presence` | bool | true / false |
-| `product_visibility` | int | 1-10 |
-| `usage_context` | enum | `in-use` / `standalone` / `lifestyle` / `abstract` / `none` |
-| `brand_prominence` | int | 1-10 |
-| `logo_present` | bool | true / false |
-| `word_count_bin` | enum | `0` / `1-5` / `6-15` / `16-40` / `40+` |
-| `text_density` | int | 1-10 |
-| `readability` | int | 1-10 |
-| `value_proposition_present` | bool | true / false |
-| `cta_present` | bool | true / false |
-| `offer_present` | bool | true / false |
-| `emotion_valence` | enum | `positive` / `neutral` / `negative` |
-| `perceived_credibility` | enum | `low` / `medium` / `high` |
-| `spamminess` | enum | `low` / `medium` / `high` |
+
+| Field                       | Type | Range / values                                              |
+| --------------------------- | ---- | ----------------------------------------------------------- |
+| `design_quality`            | enum | `low` / `medium` / `high`                                   |
+| `visual_clutter`            | int  | 1-10                                                        |
+| `focal_point_presence`      | int  | 1-10                                                        |
+| `contrast_level`            | int  | 1-10                                                        |
+| `visual_saliency_score`     | int  | 1-10                                                        |
+| `primary_subject_type`      | enum | `product` / `person` / `scene` / `text-only` / `mixed`      |
+| `human_presence`            | bool | true / false                                                |
+| `product_visibility`        | int  | 1-10                                                        |
+| `usage_context`             | enum | `in-use` / `standalone` / `lifestyle` / `abstract` / `none` |
+| `brand_prominence`          | int  | 1-10                                                        |
+| `logo_present`              | bool | true / false                                                |
+| `word_count_bin`            | enum | `0` / `1-5` / `6-15` / `16-40` / `40+`                      |
+| `text_density`              | int  | 1-10                                                        |
+| `readability`               | int  | 1-10                                                        |
+| `value_proposition_present` | bool | true / false                                                |
+| `cta_present`               | bool | true / false                                                |
+| `offer_present`             | bool | true / false                                                |
+| `emotion_valence`           | enum | `positive` / `neutral` / `negative`                         |
+| `perceived_credibility`     | enum | `low` / `medium` / `high`                                   |
+| `spamminess`                | enum | `low` / `medium` / `high`                                   |
+
 
 ---
 

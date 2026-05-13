@@ -105,11 +105,13 @@ python -m src.model.sentient_dataset --include-demographics --head 5
 
 The two models answer **different questions** even though both use AUC:
 
-| Model | Question | Granularity | Where to read AUC |
-|---|---|---|---|
-| Content IAB (LR/Ridge/kNN) | "Does user U have net positive interest in IAB-t1 category K?" | per-`(user, 1-of-34 IAB cats)` | `Data/model_comparison.csv` |
-| Sentient pair (LR/GBM) | "Will user U like ad A specifically?" | per-`(user, 1-of-300 ads)` | `Data/sentient_pair_metrics.csv` |
-| Sentient aggregated | (sentient predictions averaged over 15 ads per ADS-16 product cat) | per-`(user, 1-of-20 product cats)` | `Data/sentient_per_category_metrics.csv` |
+
+| Model                      | Question                                                           | Granularity                        | Where to read AUC                        |
+| -------------------------- | ------------------------------------------------------------------ | ---------------------------------- | ---------------------------------------- |
+| Content IAB (LR/Ridge/kNN) | "Does user U have net positive interest in IAB-t1 category K?"     | per-`(user, 1-of-34 IAB cats)`     | `Data/model_comparison.csv`              |
+| Sentient pair (LR/GBM)     | "Will user U like ad A specifically?"                              | per-`(user, 1-of-300 ads)`         | `Data/sentient_pair_metrics.csv`         |
+| Sentient aggregated        | (sentient predictions averaged over 15 ads per ADS-16 product cat) | per-`(user, 1-of-20 product cats)` | `Data/sentient_per_category_metrics.csv` |
+
 
 The aggregated AUCs are on the same scale as `model_comparison.csv` but the category axis is different (20 ADS-16 product cats vs 34 IAB-t1 cats), so use them as a "is the new model in the same neighbourhood?" sanity check rather than a strict winner-vs-loser comparison.
 
@@ -123,7 +125,7 @@ python -m src.model.iab_best
 
 Runs in ~10s. Output: `Data/iab_config_search.csv` (one row per config: `per_cat_macro_auc, pair_auc, pair_ap`) and a printed winner.
 
-**Winner**: `knn_frac (k=25)` — kNeighborsRegressor with cosine distance on the `frac_positive` target (continuous in [0, 1]). Pair AUC **0.5929**, vs the previous LR-on-binary default at **0.5405** (+0.052). The key insight: `frac_positive` retains ranking under multi-hot averaging, while signed `net_likes` collapses to noise after projection. See [`docs/ensemble_results.md`](docs/ensemble_results.md) for the full explanation.
+**Winner**: `knn_frac (k=25)` — kNeighborsRegressor with cosine distance on the `frac_positive` target (continuous in [0, 1]). Pair AUC **0.5929**, vs the previous LR-on-binary default at **0.5405** (+0.052). The key insight: `frac_positive` retains ranking under multi-hot averaging, while signed `net_likes` collapses to noise after projection. See `[docs/ensemble_results.md](docs/ensemble_results.md)` for the full explanation.
 
 ## Quick start: ensemble the IAB and sentient models
 
@@ -144,17 +146,20 @@ Output: `Data/ensemble_metrics.csv` (one row per strategy: AUC, AP, accuracy, de
 
 **Current best**: `mean` and `weighted_alpha=0.45` both hit pair AUC **0.6336** (up from 0.6234 with the previous IAB; +0.018 over sentient alone, +0.041 over IAB alone). The optimal mixing weight shifted from 0.15 (mostly sentient) to ~0.45 (near-equal), reflecting the IAB upgrade. Strategies evaluated:
 
-| Strategy | What it does | Deployable? |
-|---|---|---|
-| `iab_only` | Just the IAB projection, no ensemble | yes |
-| `sentient_only` | Just the sentient model | yes |
-| `mean` | `0.5 * p_iab + 0.5 * p_sentient` | yes |
-| `weighted_alpha=X` | `α * p_iab + (1-α) * p_sentient`, α swept on the 21-point grid `{0, 0.05, …, 1.0}` and the AUC-best α reported | yes |
-| `stack_lr_oof` | Logistic-regression meta-learner on `(p_iab, p_sentient)`, also OOF-trained per fold | yes |
-| `max_confidence` | Per-pair: pick whichever score is further from 0.5 (the model that's "more decisive") — your "best of the 2 models per prediction" | yes |
-| `oracle (upper bound)` | Per-pair: pick whichever model's score is closer to truth. Cheats on the label, NOT deployable — shows the headroom from a perfect router | no |
+
+| Strategy               | What it does                                                                                                                              | Deployable? |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| `iab_only`             | Just the IAB projection, no ensemble                                                                                                      | yes         |
+| `sentient_only`        | Just the sentient model                                                                                                                   | yes         |
+| `mean`                 | `0.5 * p_iab + 0.5 * p_sentient`                                                                                                          | yes         |
+| `weighted_alpha=X`     | `α * p_iab + (1-α) * p_sentient`, α swept on the 21-point grid `{0, 0.05, …, 1.0}` and the AUC-best α reported                            | yes         |
+| `stack_lr_oof`         | Logistic-regression meta-learner on `(p_iab, p_sentient)`, also OOF-trained per fold                                                      | yes         |
+| `max_confidence`       | Per-pair: pick whichever score is further from 0.5 (the model that's "more decisive") — your "best of the 2 models per prediction"        | yes         |
+| `oracle (upper bound)` | Per-pair: pick whichever model's score is closer to truth. Cheats on the label, NOT deployable — shows the headroom from a perfect router | no          |
+
 
 Useful flags for ablations:
+
 ```bash
 # Restore the old IAB (LR-on-binary) for direct comparison
 python -m src.model.ensemble --iab-model lr --iab-target binary --iab-hparam 1.0
@@ -163,7 +168,7 @@ python -m src.model.ensemble --iab-model lr --iab-target binary --iab-hparam 1.0
 python -m src.model.ensemble --iab-model ridge --iab-target frac_positive --iab-hparam 200
 ```
 
-Detailed write-up + interpretation: [`docs/ensemble_results.md`](docs/ensemble_results.md).
+Detailed write-up + interpretation: `[docs/ensemble_results.md](docs/ensemble_results.md)`.
 
 ## Quick start: 6-base majority voting
 
@@ -175,7 +180,7 @@ python -m src.model.voting --save-predictions
 
 Runs in ~30s. Each base model casts a binary `like` vote per pair; we then evaluate `majority_6 (≥4)`, `majority_iab (≥2 of 3)`, `majority_sent (≥2 of 3)`, `unanimous_6`, `any_6 (≥1)`, plus the continuous `vote_count` (0..6) used for AUC ranking. Output: `Data/voting_metrics.csv` (per-base-model + per-strategy metrics) and optionally `Data/voting_pair_predictions.csv` (each model's votes per pair).
 
-**Result**: voting tops out at AUC 0.572 — *worse* than the weighted ensemble at 0.623. Hard thresholding throws away each base model's confidence, weak voters dilute strong ones, and the 0..6 vote axis is too coarse for AUC ranking. Detailed analysis + the three lessons in [`docs/voting_results.md`](docs/voting_results.md).
+**Result**: voting tops out at AUC 0.572 — *worse* than the weighted ensemble at 0.623. Hard thresholding throws away each base model's confidence, weak voters dilute strong ones, and the 0..6 vote axis is too coarse for AUC ranking. Detailed analysis + the three lessons in `[docs/voting_results.md](docs/voting_results.md)`.
 
 ## Re-running the data pipeline (only if you want fresh LLM tags)
 
@@ -195,15 +200,17 @@ python -m src.data_loader.main --users U0001 --limit 6
 
 ## Inputs
 
-| File | Shape | What it is |
-|---|---|---|
-| `Data/user_features.csv` | 120 × 136 | One row per user. All columns are 0/1 indicators except `inf__age`, `inf__weekly_working_hours`, `inf__income` (numeric). Prefixes: `inf__` (demographics), `pref__` (self-reported preferences for music / books / movies / TV / websites). |
-| `Data/ads16_multihot_t1.csv` | 300 × 40 | One row per ad image, indexed by `image_id` of the form `"<category>_<image>"` (e.g. `1_1` ... `20_15`). 34 of the columns are the canonical IAB Tier-1 categories with values in `{0, 1}`; the remaining 6 are metadata (`category`, `image_index`, `path`, `raw_text`, `n_matched`, `n_unmatched`). |
-| `Data/ADS-16/.../*-RT.csv` | 1 per user | Raw 5-point ratings the user gave to each of the 300 ads. Loaded by `ADS16DataProcessor` and aligned to the multi-hot via `image_id`. |
-| `Data/ADS-16/.../*-B5.csv` | 1 per user | TIPI-style 10-question Big-5 personality answers (`;`-delimited, `Question#;Answer`). Used by the sentient model. |
-| `Data/sentiment_multihot_clusters.csv` | 120 × 51 | Per-user 50-dim revealed visual taste over image clusters. Each `cluster_NN` ∈ {-1, 0, +1} encoding "user has a personally-supplied IM-NEG / IM-POS image in this cluster". Built externally by clustering all `UXXXX-IM-{POS,NEG}/*.png` by visual embedding. Used by the sentient model. |
-| `Data/ads16_design_features.csv` | 300 × 20 | Per-ad LLM-extracted design / sentiment features (4 ordered enums, 3 unordered enums, 5 booleans, 8 ints in 1–10). Indexed by `image_id`. Built by `src/ad_design/`. |
-| `src/data_loader/agent_processing/IAB-t1.csv` | 34 lines | Canonical IAB Tier-1 category list. Used both to build the LLM prompt and to filter multi-hot columns down to "real" categories. |
+
+| File                                          | Shape      | What it is                                                                                                                                                                                                                                                                                            |
+| --------------------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Data/user_features.csv`                      | 120 × 136  | One row per user. All columns are 0/1 indicators except `inf__age`, `inf__weekly_working_hours`, `inf__income` (numeric). Prefixes: `inf__` (demographics), `pref__` (self-reported preferences for music / books / movies / TV / websites).                                                          |
+| `Data/ads16_multihot_t1.csv`                  | 300 × 40   | One row per ad image, indexed by `image_id` of the form `"<category>_<image>"` (e.g. `1_1` ... `20_15`). 34 of the columns are the canonical IAB Tier-1 categories with values in `{0, 1}`; the remaining 6 are metadata (`category`, `image_index`, `path`, `raw_text`, `n_matched`, `n_unmatched`). |
+| `Data/ADS-16/.../*-RT.csv`                    | 1 per user | Raw 5-point ratings the user gave to each of the 300 ads. Loaded by `ADS16DataProcessor` and aligned to the multi-hot via `image_id`.                                                                                                                                                                 |
+| `Data/ADS-16/.../*-B5.csv`                    | 1 per user | TIPI-style 10-question Big-5 personality answers (`;`-delimited, `Question#;Answer`). Used by the sentient model.                                                                                                                                                                                     |
+| `Data/sentiment_multihot_clusters.csv`        | 120 × 51   | Per-user 50-dim revealed visual taste over image clusters. Each `cluster_NN` ∈ {-1, 0, +1} encoding "user has a personally-supplied IM-NEG / IM-POS image in this cluster". Built externally by clustering all `UXXXX-IM-{POS,NEG}/*.png` by visual embedding. Used by the sentient model.            |
+| `Data/ads16_design_features.csv`              | 300 × 20   | Per-ad LLM-extracted design / sentiment features (4 ordered enums, 3 unordered enums, 5 booleans, 8 ints in 1–10). Indexed by `image_id`. Built by `src/ad_design/`.                                                                                                                                  |
+| `src/data_loader/agent_processing/IAB-t1.csv` | 34 lines   | Canonical IAB Tier-1 category list. Used both to build the LLM prompt and to filter multi-hot columns down to "real" categories.                                                                                                                                                                      |
+
 
 ## Labels produced and used by the models
 
@@ -237,24 +244,26 @@ All three predictions are evaluated against the same `y_binary` (for AUC, AP) an
 
 ## Outputs
 
-| File | Produced by | What's in it |
-|---|---|---|
-| `Data/ads16_agent_responses_t1.jsonl` | `main.py` stage 2 | Raw LLM response per image (resumable). |
-| `Data/ads16_multihot_t1.csv` | `main.py` stage 3 | The multi-hot matrix described above. |
-| `Data/user_vectors_t1.csv` | `main.py` stage 4 | `ratings @ multihot` per user (centered + L2-normalized by default). Not used by the model comparison; produced for downstream similarity work. |
-| `Data/user_labels_above_mean.csv` | `train_logistic.py` | 120 × 26 binary `y_binary` matrix. |
-| `Data/user_labels_above_mean_net.csv` | `train_logistic.py` | 120 × 26 signed `net_likes` matrix. |
-| `Data/model_comparison.csv` | `compare_models.py` | Content IAB: per-category AUC / AP / Spearman for LR/Ridge/kNN + winner column. |
-| `Data/iab_config_search.csv` | `iab_best.py` | IAB winner search: one row per `(model, target, hparam)` with `per_cat_macro_auc, pair_auc, pair_ap`. Used to pin the default IAB config in `ensemble.py`. |
-| `Data/{ridge,knn,logistic}_per_category_metrics.csv` | the matching trainer | Single-model per-category metrics (more detailed than the comparison file). |
-| `Data/models/{lr,ridge,knn}_model.joblib` | `compare_models.py --save-models` | Per-category fitted pipelines for the content IAB models, loadable via `src.model.loader.load_bundle`. |
-| `Data/sentient_pair_metrics.csv` | `train_sentient.py` | Pair-level AUC / AP / accuracy for `(profile, model)` combinations. |
-| `Data/sentient_per_category_metrics.csv` | `train_sentient.py` | Sentient model predictions averaged to per-(user, ADS-16 product cat) and scored on the same `net_likes >= 1` label as the content models. |
-| `Data/models/sentient_{lr,gbm}_{compact,with_demographics}.joblib` | `train_sentient.py --save-models` | Refit-on-full-data sentient pipelines. |
-| `Data/ensemble_metrics.csv` | `ensemble.py` | Pair-level AUC / AP / accuracy for `iab_only`, `sentient_only`, `mean`, `weighted_alpha=*`, `stack_lr_oof`, `max_confidence`, `oracle`. See [`docs/ensemble_results.md`](docs/ensemble_results.md). |
-| `Data/ensemble_pair_predictions.csv` | `ensemble.py --save-predictions` | One row per (user, ad): `user_id, image_id, rating, y_pair, p_iab, p_sent, p_stack`. |
-| `Data/voting_metrics.csv` | `voting.py` | 6 base models (LR/Ridge/kNN on each of IAB and sentient sides) + 6 voting strategies (`majority_6`, `majority_iab`, `majority_sent`, `unanimous_6`, `any_6`, `vote_count`). See [`docs/voting_results.md`](docs/voting_results.md). |
-| `Data/voting_pair_predictions.csv` | `voting.py --save-predictions` | One row per (user, ad) with each base model's binary vote and the total vote count. |
+
+| File                                                               | Produced by                       | What's in it                                                                                                                                                                                                                        |
+| ------------------------------------------------------------------ | --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Data/ads16_agent_responses_t1.jsonl`                              | `main.py` stage 2                 | Raw LLM response per image (resumable).                                                                                                                                                                                             |
+| `Data/ads16_multihot_t1.csv`                                       | `main.py` stage 3                 | The multi-hot matrix described above.                                                                                                                                                                                               |
+| `Data/user_vectors_t1.csv`                                         | `main.py` stage 4                 | `ratings @ multihot` per user (centered + L2-normalized by default). Not used by the model comparison; produced for downstream similarity work.                                                                                     |
+| `Data/user_labels_above_mean.csv`                                  | `train_logistic.py`               | 120 × 26 binary `y_binary` matrix.                                                                                                                                                                                                  |
+| `Data/user_labels_above_mean_net.csv`                              | `train_logistic.py`               | 120 × 26 signed `net_likes` matrix.                                                                                                                                                                                                 |
+| `Data/model_comparison.csv`                                        | `compare_models.py`               | Content IAB: per-category AUC / AP / Spearman for LR/Ridge/kNN + winner column.                                                                                                                                                     |
+| `Data/iab_config_search.csv`                                       | `iab_best.py`                     | IAB winner search: one row per `(model, target, hparam)` with `per_cat_macro_auc, pair_auc, pair_ap`. Used to pin the default IAB config in `ensemble.py`.                                                                          |
+| `Data/{ridge,knn,logistic}_per_category_metrics.csv`               | the matching trainer              | Single-model per-category metrics (more detailed than the comparison file).                                                                                                                                                         |
+| `Data/models/{lr,ridge,knn}_model.joblib`                          | `compare_models.py --save-models` | Per-category fitted pipelines for the content IAB models, loadable via `src.model.loader.load_bundle`.                                                                                                                              |
+| `Data/sentient_pair_metrics.csv`                                   | `train_sentient.py`               | Pair-level AUC / AP / accuracy for `(profile, model)` combinations.                                                                                                                                                                 |
+| `Data/sentient_per_category_metrics.csv`                           | `train_sentient.py`               | Sentient model predictions averaged to per-(user, ADS-16 product cat) and scored on the same `net_likes >= 1` label as the content models.                                                                                          |
+| `Data/models/sentient_{lr,gbm}_{compact,with_demographics}.joblib` | `train_sentient.py --save-models` | Refit-on-full-data sentient pipelines.                                                                                                                                                                                              |
+| `Data/ensemble_metrics.csv`                                        | `ensemble.py`                     | Pair-level AUC / AP / accuracy for `iab_only`, `sentient_only`, `mean`, `weighted_alpha=`*, `stack_lr_oof`, `max_confidence`, `oracle`. See `[docs/ensemble_results.md](docs/ensemble_results.md)`.                                 |
+| `Data/ensemble_pair_predictions.csv`                               | `ensemble.py --save-predictions`  | One row per (user, ad): `user_id, image_id, rating, y_pair, p_iab, p_sent, p_stack`.                                                                                                                                                |
+| `Data/voting_metrics.csv`                                          | `voting.py`                       | 6 base models (LR/Ridge/kNN on each of IAB and sentient sides) + 6 voting strategies (`majority_6`, `majority_iab`, `majority_sent`, `unanimous_6`, `any_6`, `vote_count`). See `[docs/voting_results.md](docs/voting_results.md)`. |
+| `Data/voting_pair_predictions.csv`                                 | `voting.py --save-predictions`    | One row per (user, ad) with each base model's binary vote and the total vote count.                                                                                                                                                 |
+
 
 ## Dependencies
 

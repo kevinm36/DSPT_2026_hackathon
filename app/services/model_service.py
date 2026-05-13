@@ -80,7 +80,39 @@ class CustomInferenceInterface:
         return scored
 
 
-default_agent_model = CustomInferenceInterface()
+def _build_default_agent_model() -> CustomInferenceInterface:
+    """Build the default model used by the FastAPI router.
+
+    Tries the real IAB+ranking-agent model first (loads the saved LR bundle
+    from ``Data/models/lr_model.joblib`` and prepares the Bedrock tagger
+    client). Falls back to the hash-based ``CustomInferenceInterface`` stub
+    if the bundle is missing or import fails, so the dev server still boots
+    when the trained artifacts aren't on disk.
+
+    Imported at the bottom of the file (rather than at the top) so this
+    module's symbols (``CustomInferenceInterface`` / ``ImagePrediction``)
+    are already defined when ``src.inference.iab_agent_model`` imports
+    them - no circular-import dance required.
+    """
+    import logging
+    log = logging.getLogger(__name__)
+    try:
+        from src.inference.iab_agent_model import IabAgentInferenceModel
+        return IabAgentInferenceModel()
+    except FileNotFoundError as exc:
+        log.warning(
+            "IabAgentInferenceModel unavailable (saved LR bundle missing: %s); "
+            "falling back to hash-based stub.", exc,
+        )
+    except Exception:
+        log.exception(
+            "IabAgentInferenceModel construction failed; "
+            "falling back to hash-based stub."
+        )
+    return CustomInferenceInterface()
+
+
+default_agent_model: CustomInferenceInterface = _build_default_agent_model()
 
 
 def stub_predict(
