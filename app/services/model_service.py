@@ -94,11 +94,12 @@ class CustomInferenceInterface:
 def configure_agent_model(name: str | None = None) -> CustomInferenceInterface:
     """Load ``ImageRankingAgentModel`` or ``IabAgentInferenceModel``; fall back to stub on failure.
 
-    Tries the real IAB+ranking-agent model first (loads the saved LR bundle
-    from ``saved_models/lr_model.joblib`` and prepares the Bedrock tagger
-    client). Falls back to the hash-based ``CustomInferenceInterface`` stub
-    if the bundle is missing or import fails, so the dev server still boots
-    when the trained artifacts aren't on disk.
+    Tries the real IAB+ranking-agent model first (loads the saved Ridge
+    bundle from ``saved_models/ridge_model.joblib`` and prepares the
+    Bedrock tagger client). Falls back to the hash-based
+    ``CustomInferenceInterface`` stub if the bundle is missing or import
+    fails, so the dev server still boots when the trained artifacts
+    aren't on disk.
 
 
     Updates the module-level ``default_agent_model`` used by ``routers/web.py``.
@@ -152,6 +153,11 @@ def configure_agent_model(name: str | None = None) -> CustomInferenceInterface:
 
 
 default_agent_model: CustomInferenceInterface = CustomInferenceInterface()
+
+# Honour AGENT_MODEL at import time so uvicorn picks up the env var.
+# Safe to call: configure_agent_model has its own try/except and falls back
+# to the stub on any failure.
+configure_agent_model()
 
 
 def stub_predict(

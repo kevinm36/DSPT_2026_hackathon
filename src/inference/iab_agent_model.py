@@ -1,14 +1,15 @@
-"""IAB-LR + ranking-agent inference model for the FastAPI demo app.
+"""IAB content + ranking-agent inference model for the FastAPI demo app.
 
 End-to-end pipeline (per request)::
 
     form profile (dict[str,str]) ─┐
                                   │  [step 1]
                                   ▼
-                       ModelBundle.predict()           (LR on user demographics)
+                       ModelBundle.predict()           (Ridge on user demographics, default)
                                   │
                                   ▼
-                       user_profile = {IAB cat: P(like in [0,1])}
+                       user_profile = {IAB cat: interest score in [0,1]}
+                       (Ridge net_likes per-cat, min-max normalised across the 26 cats)
 
     uploaded images list ─┐
                           │  [step 2]   always-LLM tag via Bedrock AgentCore
@@ -32,8 +33,9 @@ Design choices the user signed off on:
     Python process; needs AWS credentials in env).
   * ``image_attributes`` surfaces the matched IAB tags themselves
     (real signal instead of placeholder palette/mood strings).
-  * ``affinity`` is per-request min-max scaled to ``[0, 1]`` so the UI bar
-    is meaningful within the batch (typically 5 images).
+  * ``affinity`` is the raw IAB dot-product score (unbounded). It's the
+    sum, over the IAB cats the image was tagged with, of the user's
+    per-cat interest score. Higher = better; not normalised to [0, 1].
 
 Failure modes degrade gracefully:
   * Missing LR bundle on disk     -> raise on construction (loud at boot).
@@ -214,16 +216,23 @@ class IabAgentInferenceModel(CustomInferenceInterface):
 
     def __init__(
         self, *,
-        lr_bundle: Optional[ModelBundle] = None,
-        bundle_name: str = "LR",
+        user_bundle: Optional[ModelBundle] = None,
+        bundle_name: str = "Ridge",
         models_dir: Path = DEFAULT_WEBAPP_MODELS_DIR,
         agent_arn: str = DEFAULT_AGENT_ARN,
         region: str = DEFAULT_REGION,
         max_tagger_workers: int = 5,
         top_k_for_reasoning: int = 5,
     ) -> None:
-        self.lr_bundle = (
-            lr_bundle if lr_bundle is not None
+        # ``user_bundle`` is the per-(user, IAB-cat) scorer. Defaults to the
+        # Ridge bundle (continuous signed net_likes) because LR's saturated
+        # 0/1 probabilities + binary image multi-hot produce integer-valued
+        # dot products that quantize the affinity to evenly-spaced fractions
+        # (e.g. {0.0, 0.5, 1.0} for 3 images). Ridge's continuous outputs,
+        # then normalised to [0, 1] in ``_user_iab_profile``, give a smooth
+        # affinity score.
+        self.user_bundle = (
+            user_bundle if user_bundle is not None
             else load_bundle(bundle_name, models_dir=models_dir)
         )
         self.tagger = _LlmTagger(
@@ -231,17 +240,43 @@ class IabAgentInferenceModel(CustomInferenceInterface):
             max_workers=max_tagger_workers,
         )
         self.scorable_categories: list[str] = list(
-            self.lr_bundle.scorable_categories
+            self.user_bundle.scorable_categories
         )
         self.top_k_for_reasoning = top_k_for_reasoning
+
+    # Backwards-compat alias: older smoke-test code accessed ``.lr_bundle``.
+    @property
+    def lr_bundle(self) -> ModelBundle:
+        return self.user_bundle
 
     # ------------------------------------------------------------------ #
     # Step 1: form profile -> IAB user_profile dict
     # ------------------------------------------------------------------ #
     def _user_iab_profile(self, profile: dict[str, str]) -> dict[str, float]:
-        feat = _build_user_feature_dict(profile, self.lr_bundle.feature_names)
-        scores = self.lr_bundle.predict(feat)  # {cat: P(like)}
-        return {c: float(scores.get(c, 0.0)) for c in self.scorable_categories}
+        """Return ``{IAB cat: interest score in [0, 1]}`` for the agent.
+
+        For LR (``score_kind == "predict_proba"``) the bundle already returns
+        ``P(like) in [0, 1]``; we just sort it into the canonical cat order.
+
+        For Ridge / kNN (``score_kind == "predict"``) the bundle returns
+        signed real ``net_likes`` predictions. We min-max normalise across
+        the 26 scorable cats so the agent receives clean ``[0, 1]`` interest
+        scores -- preserves rank order, makes the dot-product non-negative,
+        and avoids the integer-quantization that LR exhibits in production.
+        """
+        feat = _build_user_feature_dict(profile, self.user_bundle.feature_names)
+        scores = self.user_bundle.predict(feat)
+        ordered = {c: float(scores.get(c, 0.0)) for c in self.scorable_categories}
+
+        if self.user_bundle.score_kind == "predict_proba":
+            return ordered  # already in [0, 1]
+
+        # Ridge / kNN: continuous signed reals -> per-cat min-max to [0, 1].
+        vals = list(ordered.values())
+        lo, hi = min(vals), max(vals)
+        if hi - lo < 1e-9:
+            return {c: 0.5 for c in ordered}
+        return {c: (v - lo) / (hi - lo) for c, v in ordered.items()}
 
     # ------------------------------------------------------------------ #
     # Step 2: image -> IAB profile via LLM tagger
@@ -341,17 +376,6 @@ class IabAgentInferenceModel(CustomInferenceInterface):
     # ------------------------------------------------------------------ #
     # Step 4: assemble ImagePrediction list
     # ------------------------------------------------------------------ #
-    @staticmethod
-    def _scale_affinities(scores: dict[str, float]) -> dict[str, float]:
-        if not scores:
-            return {}
-        vals = list(scores.values())
-        lo, hi = min(vals), max(vals)
-        if hi - lo < 1e-9:
-            # Degenerate: all equal -> assign 0.5 across the board.
-            return {k: 0.5 for k in scores}
-        return {k: (v - lo) / (hi - lo) for k, v in scores.items()}
-
     def predict(
         self,
         image_payloads: list[tuple[str, bytes]],
@@ -392,10 +416,9 @@ class IabAgentInferenceModel(CustomInferenceInterface):
                     ).strip()
             analysis_text = str(agent_result.get("analysis", "")).strip()
 
-        # Always recompute the dot product locally so the affinity scale is
-        # consistent, regardless of whether the LLM returned a numeric score.
+        # Affinity = raw IAB dot product (no per-batch normalisation).
+        # The downstream UI may render unbounded values; that's intentional.
         raw_scores = self._local_dot_product(user_profile, ad_records)
-        scaled = self._scale_affinities(raw_scores)
 
         # ---- Step 4: build ImagePrediction list ----
         predictions: list[ImagePrediction] = []
@@ -412,7 +435,7 @@ class IabAgentInferenceModel(CustomInferenceInterface):
             if agent_err:
                 reason_parts.append(
                     f"Claude reasoning unavailable ({agent_err}); "
-                    f"affinity is the IAB dot-product score scaled to [0, 1]."
+                    f"affinity is the raw IAB dot-product score."
                 )
             if not agent_err and ad_id in per_ad_reasoning and per_ad_reasoning[ad_id]:
                 reason_parts.append(per_ad_reasoning[ad_id])
@@ -428,7 +451,7 @@ class IabAgentInferenceModel(CustomInferenceInterface):
                 ImagePrediction(
                     slot_index=rec["slot_index"],
                     filename=rec["filename"],
-                    affinity=float(scaled.get(ad_id, 0.0)),
+                    affinity=float(raw_scores.get(ad_id, 0.0)),
                     reason=" \n\n".join(reason_parts) if reason_parts
                     else "IAB dot-product affinity (no additional context).",
                     image_attributes=self._image_attributes_from_iab(rec),
