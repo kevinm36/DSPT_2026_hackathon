@@ -35,7 +35,7 @@ Build a Python web app where the user uploads up to five images and supplies a c
 | `services/results_cache.py` | In-memory store for result payloads keyed by `rid`. |
 | `services/vocab.py` | Load and validate profile against JSON vocabulary. |
 | `scripts/build_profile_attributes.py` | Regenerates `profile_attributes.json` and `sample_valid_profile.csv` from `user_features_manifest.json`. |
-| `services/model_service.py` | **`AgentModel.predict`** on **`default_agent_model`** — scores, reasons, and stub **image attributes** per slot (`stub_predict` delegates here). |
+| `services/model_service.py` | **`CustomInferenceInterface.predict`** on **`default_agent_model`** — scores, reasons, and stub **image attributes** per slot (`stub_predict` delegates here). |
 | `templates/results.html` | Ranked gallery + `#detail-slot`. |
 | `templates/partials/image_detail.html` | HTMX fragment for one image. |
 | `static/style.css` | Gallery, active thumb, detail panel. |
@@ -79,4 +79,4 @@ Edit `profile_attributes.json`: set attribute `label`, categorical `options` ent
 
 ## Replacing the stub model
 
-Implement **`AgentModel.predict`** (or replace **`default_agent_model`**) in `services/model_service.py` so the real model returns, per image slot: `affinity`, `reason`, and `image_attributes` (dict of categorical outputs). `routers/web.py` maps those into the cache payload consumed by `results.html` and `partials/image_detail.html`.
+Implement **`CustomInferenceInterface.predict`** (or replace **`default_agent_model`**) in `services/model_service.py` so the real model returns, per image slot: `affinity`, `reason`, and `image_attributes` (dict of categorical outputs). `routers/web.py` maps those into the cache payload consumed by `results.html` and `partials/image_detail.html`.

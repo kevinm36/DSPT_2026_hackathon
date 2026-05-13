@@ -17,7 +17,7 @@ This document lists the **exact call site**, **recommended implementation module
     predictions = model_service.default_agent_model.predict(tuples, profile)
 ```
 
-**What to change:** keep the two lines that build `tuples` and `profile`; implement your pipeline on **`AgentModel.predict`** (or replace **`default_agent_model`** with your own `AgentModel` subclass / instance). The thin wrapper **`stub_predict`** still delegates to **`default_agent_model.predict`** if you prefer to keep a function-style entry point.
+**What to change:** keep the two lines that build `tuples` and `profile`; implement your pipeline on **`CustomInferenceInterface.predict`** (or replace **`default_agent_model`** with your own `CustomInferenceInterface` subclass / instance). The thin wrapper **`stub_predict`** still delegates to **`default_agent_model.predict`** if you prefer to keep a function-style entry point.
 
 The loop below **must** still receive something iterable like the current `predictions` list, with the same per-element fields described in section 4.
 
@@ -49,7 +49,7 @@ The loop below **must** still receive something iterable like the current `predi
 | Location | Responsibility |
 |----------|----------------|
 | Top of file / new helpers | `joblib.load`, `torch.load`, `onnxruntime`, path constants, feature preprocessing. |
-| **`AgentModel.predict`** (or a subclass) | Map `(image_payloads, profile)` → `list[ImagePrediction]`. |
+| **`CustomInferenceInterface.predict`** (or a subclass) | Map `(image_payloads, profile)` → `list[ImagePrediction]`. |
 | **`default_agent_model`** | Module-level instance used by `web.py`; replace or rebind after loading a real artifact. |
 | `ImagePrediction` dataclass | Extend only if you also update the mapping in `web.py` (section 4). |
 
@@ -65,7 +65,7 @@ class ImagePrediction:
     image_attributes: dict[str, str]
 
 
-class AgentModel:
+class CustomInferenceInterface:
     def predict(
         self,
         image_payloads: list[tuple[str, bytes]],
@@ -76,7 +76,7 @@ class AgentModel:
         return scored
 
 
-default_agent_model = AgentModel()
+default_agent_model = CustomInferenceInterface()
 
 
 def stub_predict(
@@ -86,7 +86,7 @@ def stub_predict(
     return default_agent_model.predict(image_payloads, profile)
 ```
 
-**Optional:** load the artifact once in **`app/main.py`** using a FastAPI `lifespan` context manager, attach the loaded object to `app.state`, and assign **`model_service.default_agent_model`** (or inject your `AgentModel` into the router—avoid circular imports).
+**Optional:** load the artifact once in **`app/main.py`** using a FastAPI `lifespan` context manager, attach the loaded object to `app.state`, and assign **`model_service.default_agent_model`** (or inject your `CustomInferenceInterface` into the router—avoid circular imports).
 
 ---
 
@@ -128,7 +128,7 @@ Your model should map this dict into whatever feature vector or tensor your trai
 
 ## 4. Output variables (what the router expects from the model)
 
-**`AgentModel.predict`** must return **`list[ImagePrediction]`** (or an iterable of objects with the **same attributes**), one entry **per uploaded image** (same length as `tuples` before any sorting).
+**`CustomInferenceInterface.predict`** must return **`list[ImagePrediction]`** (or an iterable of objects with the **same attributes**), one entry **per uploaded image** (same length as `tuples` before any sorting).
 
 ### 4.1 `ImagePrediction` fields
 
@@ -170,7 +170,7 @@ These files **consume** the cached structure; they do not call the model:
 
 ## 6. Minimal integration checklist
 
-1. Implement inference on **`AgentModel.predict`** in **`app/services/model_service.py`** (or replace **`default_agent_model`**); the call site in **`app/routers/web.py`** is **`default_agent_model.predict(tuples, profile)`** (around the `image_rows, profile = outcome` block).
+1. Implement inference on **`CustomInferenceInterface.predict`** in **`app/services/model_service.py`** (or replace **`default_agent_model`**); the call site in **`app/routers/web.py`** is **`default_agent_model.predict(tuples, profile)`** (around the `image_rows, profile = outcome` block).
 2. Accept **`image_payloads: list[tuple[str, bytes]]`** and **`profile: dict[str, str]`**.
 3. Return **`list[ImagePrediction]`** with **`slot_index`** aligned to input order, **`affinity`** sortable descending, and string **`reason`** / **`image_attributes`** for the UI.
 4. Keep **`web.py`** mapping loop (section 1) unchanged unless you intentionally extend the UI contract.

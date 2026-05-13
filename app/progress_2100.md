@@ -52,7 +52,7 @@ Users upload **one to five** images and provide a **customer profile** (numerica
 7. **Ranked gallery** — Thumbnails ordered by descending score; rank badge and filename/score metadata.
 8. **HTMX detail** — Clicking a thumbnail loads a partial with **image-level stub attributes** and **prediction reason** text.
 9. **Navigation** — “New prediction” returns to `/`; template download and inline hints link to `/profile/csv-template`.
-10. **Stub model** — `model_service.AgentModel.predict` on **`default_agent_model`**: deterministic scores from hashes + profile digest; returns `slot_index`, `image_attributes` dict, and `reason` per image (replace with real trained pipeline later). `stub_predict(...)` remains a thin delegate for compatibility.
+10. **Stub model** — `model_service.CustomInferenceInterface.predict` on **`default_agent_model`**: deterministic scores from hashes + profile digest; returns `slot_index`, `image_attributes` dict, and `reason` per image (replace with real trained pipeline later). `stub_predict(...)` remains a thin delegate for compatibility.
 
 ---
 
@@ -65,7 +65,7 @@ Users upload **one to five** images and provide a **customer profile** (numerica
 | `services/submission.py` | Multipart image handling; profile from **form fields** via `merge_profile_from_form`; `parse_profile_csv` kept for tooling/tests; `data_url_for_image`. |
 | `services/vocab.py` | `AttributeSpec`, `CategoricalOption`, `load_profile_vocab`, `validate_profile`. |
 | `services/results_cache.py` | UUID store for result payloads between redirect and HTMX partials. |
-| `services/model_service.py` | `AgentModel` + `default_agent_model`; stub `predict`; `ImagePrediction` output type. |
+| `services/model_service.py` | `CustomInferenceInterface` + `default_agent_model`; stub `predict`; `ImagePrediction` output type. |
 | `profile_attributes.json` | Authoritative profile field definitions (often rebuilt from manifest). |
 | `user_features_manifest.json` | Source list of `numeric_columns` and `categorical_columns` feature names. |
 | `scripts/build_profile_attributes.py` | Regenerates `profile_attributes.json` + `sample_valid_profile.csv` from the manifest. |
@@ -110,7 +110,7 @@ For step-by-step prose and troubleshooting, see **`app/user_manual.md`**.
 
 ## Integration notes (future work)
 
-- Replace **`AgentModel.predict`** on **`default_agent_model`** (or swap in your own `AgentModel`) in `services/model_service.py` for the real artifact; keep return shape compatible with `routers/web.py` (per-slot filename, score, reason, image-side attributes). `stub_predict` delegates to the same implementation if you still call it from tests.
+- Replace **`CustomInferenceInterface.predict`** on **`default_agent_model`** (or swap in your own `CustomInferenceInterface`) in `services/model_service.py` for the real artifact; keep return shape compatible with `routers/web.py` (per-slot filename, score, reason, image-side attributes). `stub_predict` delegates to the same implementation if you still call it from tests.
 - If the production model expects a different profile vectorization (e.g. full multihot width), map the submitted `dict[str, str]` profile into that representation inside the model service or a dedicated adapter.
 - The results cache is **process-local** and **ephemeral**; it is suitable for demos and single-instance deployment, not durable multi-server state.
 

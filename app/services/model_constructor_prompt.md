@@ -1,4 +1,4 @@
-Now I want to refactor `model_service.py` a bit to construct a class `AgentModel` that has the following interface:
+Now I want to refactor `model_service.py` a bit to construct a class `CustomInferenceInterface` that has the following interface:
 
 # Input: parameter input to method `predict`
 

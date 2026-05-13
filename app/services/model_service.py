@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class ImagePrediction:
-    """Per-image output from `AgentModel.predict`."""
+    """Per-image output from `CustomInferenceInterface.predict`."""
 
     slot_index: int
     filename: str
@@ -15,7 +15,7 @@ class ImagePrediction:
     image_attributes: dict[str, str]
 
 
-class AgentModel:
+class CustomInferenceInterface:
     """
     Affinity model interface: images + user profile in, ranked predictions out.
 
@@ -64,7 +64,7 @@ class AgentModel:
             affinity = int(h[:8], 16) / 0xFFFFFFFF
             reason = (
                 f"Stub model: affinity derived from image hash and profile digest "
-                f"{profile_digest}. Replace AgentModel.predict with your trained model."
+                f"{profile_digest}. Replace CustomInferenceInterface.predict with your trained model."
             )
             scored.append(
                 ImagePrediction(
@@ -80,7 +80,7 @@ class AgentModel:
         return scored
 
 
-default_agent_model = AgentModel()
+default_agent_model = CustomInferenceInterface()
 
 
 def stub_predict(
