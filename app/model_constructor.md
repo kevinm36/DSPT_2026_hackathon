@@ -11,17 +11,17 @@ This document lists the **exact call site**, **recommended implementation module
 
 **Call today:**
 
-```91:93:app/routers/web.py
+```89:91:app/routers/web.py
     image_rows, profile = outcome
     tuples = [(r["filename"], r["raw"]) for r in image_rows]
-    predictions = model_service.stub_predict(tuples, profile)
+    predictions = model_service.default_agent_model.predict(tuples, profile)
 ```
 
-**What to change:** keep the two lines that build `tuples` and `profile`; replace `model_service.stub_predict(...)` with your own function (either rename `stub_predict` to `predict` inside `model_service.py` and call that here, or call a new symbol such as `model_service.run_trained_model(tuples, profile)`).
+**What to change:** keep the two lines that build `tuples` and `profile`; implement your pipeline on **`AgentModel.predict`** (or replace **`default_agent_model`** with your own `AgentModel` subclass / instance). The thin wrapper **`stub_predict`** still delegates to **`default_agent_model.predict`** if you prefer to keep a function-style entry point.
 
 The loop below **must** still receive something iterable like the current `predictions` list, with the same per-element fields described in section 4.
 
-```95:108:app/routers/web.py
+```93:106:app/routers/web.py
     items: list[dict[str, Any]] = []
     for rank, pred in enumerate(predictions, start=1):
         row = image_rows[pred.slot_index]
@@ -49,12 +49,13 @@ The loop below **must** still receive something iterable like the current `predi
 | Location | Responsibility |
 |----------|----------------|
 | Top of file / new helpers | `joblib.load`, `torch.load`, `onnxruntime`, path constants, feature preprocessing. |
-| Replace body of `stub_predict` (or add `predict` and delegate) | Map `(image_payloads, profile)` → `list[ImagePrediction]`. |
+| **`AgentModel.predict`** (or a subclass) | Map `(image_payloads, profile)` → `list[ImagePrediction]`. |
+| **`default_agent_model`** | Module-level instance used by `web.py`; replace or rebind after loading a real artifact. |
 | `ImagePrediction` dataclass | Extend only if you also update the mapping in `web.py` (section 4). |
 
-Current stub and output type definition:
+Current stub and output type definition (abbreviated):
 
-```7:60:app/services/model_service.py
+```7:91:app/services/model_service.py
 @dataclass(frozen=True)
 class ImagePrediction:
     slot_index: int
@@ -64,20 +65,28 @@ class ImagePrediction:
     image_attributes: dict[str, str]
 
 
-def _stub_image_attributes(blob: bytes) -> dict[str, str]:
-    """Placeholder image-side categoricals until the real model returns them."""
-    ...
+class AgentModel:
+    def predict(
+        self,
+        image_payloads: list[tuple[str, bytes]],
+        profile: dict[str, str],
+    ) -> list[ImagePrediction]:
+        ...
+        scored.sort(key=lambda p: p.affinity, reverse=True)
+        return scored
+
+
+default_agent_model = AgentModel()
+
 
 def stub_predict(
     image_payloads: list[tuple[str, bytes]],
     profile: dict[str, str],
 ) -> list[ImagePrediction]:
-    ...
-    scored.sort(key=lambda p: p.affinity, reverse=True)
-    return scored
+    return default_agent_model.predict(image_payloads, profile)
 ```
 
-**Optional:** load the artifact once in **`app/main.py`** using a FastAPI `lifespan` context manager, attach the loaded object to `app.state`, and read it from inside `model_service` via a small setter or import of the app (avoid circular imports—prefer passing the model into a function or a dedicated singleton module).
+**Optional:** load the artifact once in **`app/main.py`** using a FastAPI `lifespan` context manager, attach the loaded object to `app.state`, and assign **`model_service.default_agent_model`** (or inject your `AgentModel` into the router—avoid circular imports).
 
 ---
 
@@ -111,13 +120,15 @@ tuples = [(r["filename"], r["raw"]) for r in image_rows]
 - **Numerical** attributes: string representation of a finite, **non-negative** number (e.g. `"42"`, `"0.5"`).
 - **Categorical** attributes: string equal to the chosen option **`value`** (full multihot token), not the human `label`.
 
+Invalid profiles (e.g. blank numerical fields, categorical **`invalid`** sentinel) are rejected in **`collect_submission`** before **`predict`** runs; the model always receives a fully valid `profile` dict.
+
 Your model should map this dict into whatever feature vector or tensor your training pipeline expects (e.g. one-hot / multihot alignment with `user_features_manifest.json`).
 
 ---
 
 ## 4. Output variables (what the router expects from the model)
 
-The model callable must return **`list[ImagePrediction]`** (or an iterable of objects with the **same attributes**), one entry **per uploaded image** (same length as `tuples` before any sorting).
+**`AgentModel.predict`** must return **`list[ImagePrediction]`** (or an iterable of objects with the **same attributes**), one entry **per uploaded image** (same length as `tuples` before any sorting).
 
 ### 4.1 `ImagePrediction` fields
 
@@ -159,7 +170,7 @@ These files **consume** the cached structure; they do not call the model:
 
 ## 6. Minimal integration checklist
 
-1. Implement inference in **`app/services/model_service.py`** (replace `stub_predict` or add a new function and switch the call in **`app/routers/web.py`** line ~93).
+1. Implement inference on **`AgentModel.predict`** in **`app/services/model_service.py`** (or replace **`default_agent_model`**); the call site in **`app/routers/web.py`** is **`default_agent_model.predict(tuples, profile)`** (around the `image_rows, profile = outcome` block).
 2. Accept **`image_payloads: list[tuple[str, bytes]]`** and **`profile: dict[str, str]`**.
 3. Return **`list[ImagePrediction]`** with **`slot_index`** aligned to input order, **`affinity`** sortable descending, and string **`reason`** / **`image_attributes`** for the UI.
 4. Keep **`web.py`** mapping loop (section 1) unchanged unless you intentionally extend the UI contract.

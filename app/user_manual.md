@@ -1,6 +1,6 @@
 # User manual — Image affinity ranker
 
-This app scores and ranks up to five images against a customer profile (numerical and categorical fields), then shows results on a separate page. You need **at least one image** and a **valid profile** (from CSV or from the form) before you run **Predict**.
+This app scores and ranks up to five images against a customer profile (numerical and categorical fields), then shows results on a separate page. You need **at least one image** and a **valid profile** in the form before you run **Predict**. (You can load a CSV locally in the browser to fill the form faster; **Predict** always submits whatever values are currently in the form.)
 
 ---
 
@@ -25,7 +25,7 @@ The screen has two tabs: **Images** and **Customer profile**. Use both before cl
 
 ## 3. Set the customer profile (Customer profile tab)
 
-Open the **Customer profile** tab. You can define the profile in **one** of two ways. If you attach a CSV file, it **overrides** whatever is entered in the form.
+Open the **Customer profile** tab. Use the form fields directly, or use an optional **local-only** CSV file in your browser to populate those fields from a spreadsheet row (see below). You can edit any field after loading a CSV; **Predict** always uses the **current form values**.
 
 Fields come from `app/user_features_manifest.json` and are compiled into `app/profile_attributes.json`:
 
@@ -38,17 +38,17 @@ Fields come from `app/user_features_manifest.json` and are compiled into `app/pr
 2. **Categorical** rows show a **dropdown**. Each choice has a **stored value** (the full multihot token, e.g. `inf__fave_sports__individual_sports_tennis_archery`) and a **display label** defined in `profile_attributes.json` under `options` as `{"value": "...", "label": "..."}`. Edit `label` to any text you want without changing `value` (CSV and form submissions still use `value`).
 3. **Default for dropdowns:** the **first** option in the list for that attribute (manifest order within the group) is pre-selected.
 
-### 3b. Upload a profile CSV (optional)
+### 3b. Load a profile CSV in the browser (optional)
 
-Use this when you already have a profile row in a spreadsheet or export.
+Use this when you already have a profile row in a spreadsheet or export and want to paste it into the form quickly. The CSV file is read **only in your browser** to fill the fields; it is **not** sent to the server on **Predict**.
 
-**Requirements:**
+**Requirements (for the file you pick locally):**
 
 - File must be plain text **UTF-8** CSV.
 - **First row:** column headers only. Header names and **order** must match the app exactly: the `id` values in `app/profile_attributes.json` (one column per numerical field and one column per **grouped** categorical attribute such as `inf__fave_sports`, `pref__most_read_books`, etc.).
-- **Second row:** exactly **one** data row. Numerical cells must be **finite and non-negative**. Categorical cells must be one of the allowed **value** strings for that column (the `value` field from `options`, not the display `label`).
+- **Second row:** exactly **one** data row. Numerical cells should be **finite and non-negative** (invalid cells appear blank in the form until you fix them). Categorical cells should be one of the allowed **value** strings for that column (the `value` field from `options`, not the display `label`); unknown values map to a blank-looking **invalid** choice that you must correct before **Predict**.
 
-**Example file in this repository:** `app/sample_valid_profile.csv` — you can upload that file as-is to satisfy the validator, or copy its structure for your own data.
+**Example file in this repository:** `app/sample_valid_profile.csv` — open it in a spreadsheet or use it as a structural reference for your own CSV.
 
 You can also download a fresh template from the running app: open the link **“this template”** on the Customer profile tab, or go to `/profile/csv-template` in the browser.
 
@@ -56,19 +56,19 @@ You can also download a fresh template from the running app: open the link **“
 `python3 app/scripts/build_profile_attributes.py`  
 to rebuild `profile_attributes.json` and `sample_valid_profile.csv` from `user_features_manifest.json`.
 
-**Important:** If you select a CSV under **Profile CSV (optional)**, the server **ignores** the form fields and uses only the CSV row (after validating it).
+**Important:** After loading a CSV, review every field. **Predict** validates and uses **only** the values shown in the form. If any field is still invalid or blank, you will see an error listing those fields by name.
 
 ---
 
 ## 4. Run prediction
 
 1. Confirm the **Images** tab has at least one file attached.
-2. Confirm the **Customer profile** tab: numbers and dropdowns look correct, or you have attached a **valid CSV**.
+2. Confirm the **Customer profile** tab: numbers and dropdowns look correct (including anything you fixed after loading a CSV).
 3. Click **Predict**.
 
 On success, the browser moves to the **results** page: thumbnails are ordered by score (best first). Click a thumbnail to load **image-level attributes** and **prediction reasoning** for that image below the gallery.
 
-If something is wrong (missing image, bad CSV header, invalid option text, wrong file type), you will see an error page with a short message and a link **Back to upload**.
+If something is wrong (missing image, invalid or blank profile fields, wrong image file type, etc.), you will see an error page with a short message and a link **Back to upload**.
 
 ---
 
@@ -84,7 +84,7 @@ From the results page, use **← New prediction** to return to the home page and
 |------|--------|
 | Images field name | Multiple inputs named `images` (up to five files). |
 | Profile via form | Non-negative number inputs; categorical dropdowns use explicit `value` / `label` pairs from JSON. |
-| Profile via CSV | Overrides the form; see `app/sample_valid_profile.csv`. |
-| Predict | Submits everything to the server and opens ranked results. |
+| Profile via CSV | **Local only:** fills the form from the first data row; edit as needed; see `app/sample_valid_profile.csv`. |
+| Predict | Submits images + **current form field values**; opens ranked results. |
 
 For developers: rebuild `app/profile_attributes.json` from `app/user_features_manifest.json` using `app/scripts/build_profile_attributes.py` whenever the manifest changes.
