@@ -34,21 +34,66 @@
       "value_type": "categorical",
       "label": "Fave Sports",
       "options": [
-        "inf__fave_sports__endurance_sports",
-        "inf__fave_sports__equestrian_sports",
-        "inf__fave_sports__hunting_sports",
-        "inf__fave_sports__i_do_not_like_sports",
-        "inf__fave_sports__individual_sports_tennis_archery",
-        "inf__fave_sports__indoor_sports",
-        "inf__fave_sports__motor_sports",
-        "inf__fave_sports__nothing",
-        "inf__fave_sports__olympic_sports",
-        "inf__fave_sports__other",
-        "inf__fave_sports__precision_sports_golf_bowling",
-        "inf__fave_sports__skating_sports",
-        "inf__fave_sports__team_sports_footbal_baseball_rugby",
-        "inf__fave_sports__water_sports",
-        "inf__fave_sports__winter_sports"
+        {
+          "value": "inf__fave_sports__endurance_sports",
+          "label": "endurance sports"
+        },
+        {
+          "value": "inf__fave_sports__equestrian_sports",
+          "label": "equestrian sports"
+        },
+        {
+          "value": "inf__fave_sports__hunting_sports",
+          "label": "hunting sports"
+        },
+        {
+          "value": "inf__fave_sports__i_do_not_like_sports",
+          "label": "i do not like sports"
+        },
+        {
+          "value": "inf__fave_sports__individual_sports_tennis_archery",
+          "label": "individual sports tennis archery"
+        },
+        {
+          "value": "inf__fave_sports__indoor_sports",
+          "label": "indoor sports"
+        },
+        {
+          "value": "inf__fave_sports__motor_sports",
+          "label": "motor sports"
+        },
+        {
+          "value": "inf__fave_sports__nothing",
+          "label": "nothing"
+        },
+        {
+          "value": "inf__fave_sports__olympic_sports",
+          "label": "olympic sports"
+        },
+        {
+          "value": "inf__fave_sports__other",
+          "label": "other"
+        },
+        {
+          "value": "inf__fave_sports__precision_sports_golf_bowling",
+          "label": "precision sports golf bowling"
+        },
+        {
+          "value": "inf__fave_sports__skating_sports",
+          "label": "skating sports"
+        },
+        {
+          "value": "inf__fave_sports__team_sports_footbal_baseball_rugby",
+          "label": "team sports footbal baseball rugby"
+        },
+        {
+          "value": "inf__fave_sports__water_sports",
+          "label": "water sports"
+        },
+        {
+          "value": "inf__fave_sports__winter_sports",
+          "label": "winter sports"
+        }
       ]
     },
     {
@@ -57,18 +102,54 @@
       "value_type": "categorical",
       "label": "Home Country",
       "options": [
-        "inf__home_country__canada",
-        "inf__home_country__czech_republic",
-        "inf__home_country__great_britain",
-        "inf__home_country__india",
-        "inf__home_country__italy",
-        "inf__home_country__phillipines",
-        "inf__home_country__romania",
-        "inf__home_country__saudi_arabia",
-        "inf__home_country__singapore",
-        "inf__home_country__slovenia",
-        "inf__home_country__united_kingdom",
-        "inf__home_country__united_states_of_america"
+        {
+          "value": "inf__home_country__canada",
+          "label": "canada"
+        },
+        {
+          "value": "inf__home_country__czech_republic",
+          "label": "czech republic"
+        },
+        {
+          "value": "inf__home_country__great_britain",
+          "label": "great britain"
+        },
+        {
+          "value": "inf__home_country__india",
+          "label": "india"
+        },
+        {
+          "value": "inf__home_country__italy",
+          "label": "italy"
+        },
+        {
+          "value": "inf__home_country__phillipines",
+          "label": "phillipines"
+        },
+        {
+          "value": "inf__home_country__romania",
+          "label": "romania"
+        },
+        {
+          "value": "inf__home_country__saudi_arabia",
+          "label": "saudi arabia"
+        },
+        {
+          "value": "inf__home_country__singapore",
+          "label": "singapore"
+        },
+        {
+          "value": "inf__home_country__slovenia",
+          "label": "slovenia"
+        },
+        {
+          "value": "inf__home_country__united_kingdom",
+          "label": "united kingdom"
+        },
+        {
+          "value": "inf__home_country__united_states_of_america",
+          "label": "united states of america"
+        }
       ]
     },
     {
@@ -77,28 +158,94 @@
       "value_type": "categorical",
       "label": "Most Listened Musics",
       "options": [
-        "pref__most_listened_musics__alternative_music",
-        "pref__most_listened_musics__asian_pop_j_pop_or_k_pop",
-        "pref__most_listened_musics__blues",
-        "pref__most_listened_musics__classical_music",
-        "pref__most_listened_musics__country_music",
-        "pref__most_listened_musics__dance_music",
-        "pref__most_listened_musics__easy_listening",
-        "pref__most_listened_musics__electronic_music",
-        "pref__most_listened_musics__european_music_folk_pop",
-        "pref__most_listened_musics__hip_hop_rap",
-        "pref__most_listened_musics__indie_pop",
-        "pref__most_listened_musics__inspirational_incl_gospel",
-        "pref__most_listened_musics__jazz",
-        "pref__most_listened_musics__latin_music",
-        "pref__most_listened_musics__new_age",
-        "pref__most_listened_musics__opera",
-        "pref__most_listened_musics__pop_popular_music",
-        "pref__most_listened_musics__r_b_soul",
-        "pref__most_listened_musics__reggae",
-        "pref__most_listened_musics__rock",
-        "pref__most_listened_musics__singer_songwriter_inc_folk",
-        "pref__most_listened_musics__world_music_beats"
+        {
+          "value": "pref__most_listened_musics__alternative_music",
+          "label": "alternative music"
+        },
+        {
+          "value": "pref__most_listened_musics__asian_pop_j_pop_or_k_pop",
+          "label": "asian pop j pop or k pop"
+        },
+        {
+          "value": "pref__most_listened_musics__blues",
+          "label": "blues"
+        },
+        {
+          "value": "pref__most_listened_musics__classical_music",
+          "label": "classical music"
+        },
+        {
+          "value": "pref__most_listened_musics__country_music",
+          "label": "country music"
+        },
+        {
+          "value": "pref__most_listened_musics__dance_music",
+          "label": "dance music"
+        },
+        {
+          "value": "pref__most_listened_musics__easy_listening",
+          "label": "easy listening"
+        },
+        {
+          "value": "pref__most_listened_musics__electronic_music",
+          "label": "electronic music"
+        },
+        {
+          "value": "pref__most_listened_musics__european_music_folk_pop",
+          "label": "european music folk pop"
+        },
+        {
+          "value": "pref__most_listened_musics__hip_hop_rap",
+          "label": "hip hop rap"
+        },
+        {
+          "value": "pref__most_listened_musics__indie_pop",
+          "label": "indie pop"
+        },
+        {
+          "value": "pref__most_listened_musics__inspirational_incl_gospel",
+          "label": "inspirational incl gospel"
+        },
+        {
+          "value": "pref__most_listened_musics__jazz",
+          "label": "jazz"
+        },
+        {
+          "value": "pref__most_listened_musics__latin_music",
+          "label": "latin music"
+        },
+        {
+          "value": "pref__most_listened_musics__new_age",
+          "label": "new age"
+        },
+        {
+          "value": "pref__most_listened_musics__opera",
+          "label": "opera"
+        },
+        {
+          "value": "pref__most_listened_musics__pop_popular_music",
+          "label": "pop popular music"
+        },
+        {
+          "value": "pref__most_listened_musics__r_b_soul",
+          "label": "r b soul"
+        },
+        {
+          "value": "pref__most_listened_musics__reggae",
+          "label": "reggae"
+        },
+        {
+          "value": "pref__most_listened_musics__rock",
+          "label": "rock"
+        },
+        {
+          "value": "pref__most_listened_musics__singer_songwriter_inc_folk",
+          "label": "singer songwriter inc folk"
+        },
+        {
+          "value": "pref__most_listened_musics__world_music_beats",
+          "label": "world music beats"
+        }
       ]
     },
     {
@@ -107,37 +254,130 @@
       "value_type": "categorical",
       "label": "Most Read Books",
       "options": [
-        "pref__most_read_books__action_and_adventure",
-        "pref__most_read_books__anthologies",
-        "pref__most_read_books__art",
-        "pref__most_read_books__autobiographies",
-        "pref__most_read_books__biographies",
-        "pref__most_read_books__children_s",
-        "pref__most_read_books__children_s_literature",
-        "pref__most_read_books__comics",
-        "pref__most_read_books__cookbooks",
-        "pref__most_read_books__diaries",
-        "pref__most_read_books__drama",
-        "pref__most_read_books__encyclopedias",
-        "pref__most_read_books__erotic_fiction",
-        "pref__most_read_books__fantasy",
-        "pref__most_read_books__guide",
-        "pref__most_read_books__history",
-        "pref__most_read_books__horror",
-        "pref__most_read_books__journals",
-        "pref__most_read_books__math",
-        "pref__most_read_books__mystery",
-        "pref__most_read_books__poetry",
-        "pref__most_read_books__prayer_books",
-        "pref__most_read_books__religious",
-        "pref__most_read_books__romance",
-        "pref__most_read_books__satire",
-        "pref__most_read_books__science",
-        "pref__most_read_books__science_fiction",
-        "pref__most_read_books__self_help",
-        "pref__most_read_books__series",
-        "pref__most_read_books__travel",
-        "pref__most_read_books__trilogies"
+        {
+          "value": "pref__most_read_books__action_and_adventure",
+          "label": "action and adventure"
+        },
+        {
+          "value": "pref__most_read_books__anthologies",
+          "label": "anthologies"
+        },
+        {
+          "value": "pref__most_read_books__art",
+          "label": "art"
+        },
+        {
+          "value": "pref__most_read_books__autobiographies",
+          "label": "autobiographies"
+        },
+        {
+          "value": "pref__most_read_books__biographies",
+          "label": "biographies"
+        },
+        {
+          "value": "pref__most_read_books__children_s",
+          "label": "children's"
+        },
+        {
+          "value": "pref__most_read_books__children_s_literature",
+          "label": "children's literature"
+        },
+        {
+          "value": "pref__most_read_books__comics",
+          "label": "comics"
+        },
+        {
+          "value": "pref__most_read_books__cookbooks",
+          "label": "cookbooks"
+        },
+        {
+          "value": "pref__most_read_books__diaries",
+          "label": "diaries"
+        },
+        {
+          "value": "pref__most_read_books__drama",
+          "label": "drama"
+        },
+        {
+          "value": "pref__most_read_books__encyclopedias",
+          "label": "encyclopedias"
+        },
+        {
+          "value": "pref__most_read_books__erotic_fiction",
+          "label": "erotic fiction"
+        },
+        {
+          "value": "pref__most_read_books__fantasy",
+          "label": "fantasy"
+        },
+        {
+          "value": "pref__most_read_books__guide",
+          "label": "guide"
+        },
+        {
+          "value": "pref__most_read_books__history",
+          "label": "history"
+        },
+        {
+          "value": "pref__most_read_books__horror",
+          "label": "horror"
+        },
+        {
+          "value": "pref__most_read_books__journals",
+          "label": "journals"
+        },
+        {
+          "value": "pref__most_read_books__math",
+          "label": "math"
+        },
+        {
+          "value": "pref__most_read_books__mystery",
+          "label": "mystery"
+        },
+        {
+          "value": "pref__most_read_books__poetry",
+          "label": "poetry"
+        },
+        {
+          "value": "pref__most_read_books__prayer_books",
+          "label": "prayer books"
+        },
+        {
+          "value": "pref__most_read_books__religious",
+          "label": "religious"
+        },
+        {
+          "value": "pref__most_read_books__romance",
+          "label": "romance"
+        },
+        {
+          "value": "pref__most_read_books__satire",
+          "label": "satire"
+        },
+        {
+          "value": "pref__most_read_books__science",
+          "label": "science"
+        },
+        {
+          "value": "pref__most_read_books__science_fiction",
+          "label": "science fiction"
+        },
+        {
+          "value": "pref__most_read_books__self_help",
+          "label": "self help"
+        },
+        {
+          "value": "pref__most_read_books__series",
+          "label": "series"
+        },
+        {
+          "value": "pref__most_read_books__travel",
+          "label": "travel"
+        },
+        {
+          "value": "pref__most_read_books__trilogies",
+          "label": "trilogies"
+        }
       ]
     },
     {
@@ -146,26 +386,86 @@
       "value_type": "categorical",
       "label": "Most Visited Websites",
       "options": [
-        "pref__most_visited_websites__automotive_sites",
-        "pref__most_visited_websites__baby_products_sites",
-        "pref__most_visited_websites__betting_sites",
-        "pref__most_visited_websites__clothing_shoes_sites",
-        "pref__most_visited_websites__computer_software_sites",
-        "pref__most_visited_websites__console_video_games_sites",
-        "pref__most_visited_websites__consumer_electronics_sites",
-        "pref__most_visited_websites__dating_sites",
-        "pref__most_visited_websites__grocery_beverages_sites",
-        "pref__most_visited_websites__health_beauty_sites",
-        "pref__most_visited_websites__home_stuffs_sites",
-        "pref__most_visited_websites__jewellery_watches_sites",
-        "pref__most_visited_websites__media_books_dvd_cd_dvd_music_sites",
-        "pref__most_visited_websites__musical_instruments_recording_equipment_sites",
-        "pref__most_visited_websites__outdoor_living_sites",
-        "pref__most_visited_websites__pet_supplies_sites",
-        "pref__most_visited_websites__sports_outdoor_sites",
-        "pref__most_visited_websites__stationery_office_supplies_sites",
-        "pref__most_visited_websites__tools_hardware_sites",
-        "pref__most_visited_websites__toys_games_sites"
+        {
+          "value": "pref__most_visited_websites__automotive_sites",
+          "label": "automotive sites"
+        },
+        {
+          "value": "pref__most_visited_websites__baby_products_sites",
+          "label": "baby products sites"
+        },
+        {
+          "value": "pref__most_visited_websites__betting_sites",
+          "label": "betting sites"
+        },
+        {
+          "value": "pref__most_visited_websites__clothing_shoes_sites",
+          "label": "clothing shoes sites"
+        },
+        {
+          "value": "pref__most_visited_websites__computer_software_sites",
+          "label": "computer software sites"
+        },
+        {
+          "value": "pref__most_visited_websites__console_video_games_sites",
+          "label": "console video games sites"
+        },
+        {
+          "value": "pref__most_visited_websites__consumer_electronics_sites",
+          "label": "consumer electronics sites"
+        },
+        {
+          "value": "pref__most_visited_websites__dating_sites",
+          "label": "dating sites"
+        },
+        {
+          "value": "pref__most_visited_websites__grocery_beverages_sites",
+          "label": "grocery beverages sites"
+        },
+        {
+          "value": "pref__most_visited_websites__health_beauty_sites",
+          "label": "health beauty sites"
+        },
+        {
+          "value": "pref__most_visited_websites__home_stuffs_sites",
+          "label": "home stuffs sites"
+        },
+        {
+          "value": "pref__most_visited_websites__jewellery_watches_sites",
+          "label": "jewellery watches sites"
+        },
+        {
+          "value": "pref__most_visited_websites__media_books_dvd_cd_dvd_music_sites",
+          "label": "media books dvd cd dvd music sites"
+        },
+        {
+          "value": "pref__most_visited_websites__musical_instruments_recording_equipment_sites",
+          "label": "musical instruments recording equipment sites"
+        },
+        {
+          "value": "pref__most_visited_websites__outdoor_living_sites",
+          "label": "outdoor living sites"
+        },
+        {
+          "value": "pref__most_visited_websites__pet_supplies_sites",
+          "label": "pet supplies sites"
+        },
+        {
+          "value": "pref__most_visited_websites__sports_outdoor_sites",
+          "label": "sports outdoor sites"
+        },
+        {
+          "value": "pref__most_visited_websites__stationery_office_supplies_sites",
+          "label": "stationery office supplies sites"
+        },
+        {
+          "value": "pref__most_visited_websites__tools_hardware_sites",
+          "label": "tools hardware sites"
+        },
+        {
+          "value": "pref__most_visited_websites__toys_games_sites",
+          "label": "toys games sites"
+        }
       ]
     },
     {
@@ -174,27 +474,90 @@
       "value_type": "categorical",
       "label": "Most Watched Movies",
       "options": [
-        "pref__most_watched_movies__action",
-        "pref__most_watched_movies__adventure",
-        "pref__most_watched_movies__animation",
-        "pref__most_watched_movies__biography",
-        "pref__most_watched_movies__comedy",
-        "pref__most_watched_movies__crime_and_gangster",
-        "pref__most_watched_movies__documentary",
-        "pref__most_watched_movies__drama",
-        "pref__most_watched_movies__epic_historical",
-        "pref__most_watched_movies__erotic",
-        "pref__most_watched_movies__family",
-        "pref__most_watched_movies__fantasy",
-        "pref__most_watched_movies__horror",
-        "pref__most_watched_movies__musical",
-        "pref__most_watched_movies__mystery",
-        "pref__most_watched_movies__romance",
-        "pref__most_watched_movies__sci_fi",
-        "pref__most_watched_movies__sport",
-        "pref__most_watched_movies__thriller",
-        "pref__most_watched_movies__war",
-        "pref__most_watched_movies__western"
+        {
+          "value": "pref__most_watched_movies__action",
+          "label": "action"
+        },
+        {
+          "value": "pref__most_watched_movies__adventure",
+          "label": "adventure"
+        },
+        {
+          "value": "pref__most_watched_movies__animation",
+          "label": "animation"
+        },
+        {
+          "value": "pref__most_watched_movies__biography",
+          "label": "biography"
+        },
+        {
+          "value": "pref__most_watched_movies__comedy",
+          "label": "comedy"
+        },
+        {
+          "value": "pref__most_watched_movies__crime_and_gangster",
+          "label": "crime and gangster"
+        },
+        {
+          "value": "pref__most_watched_movies__documentary",
+          "label": "documentary"
+        },
+        {
+          "value": "pref__most_watched_movies__drama",
+          "label": "drama"
+        },
+        {
+          "value": "pref__most_watched_movies__epic_historical",
+          "label": "epic historical"
+        },
+        {
+          "value": "pref__most_watched_movies__erotic",
+          "label": "erotic"
+        },
+        {
+          "value": "pref__most_watched_movies__family",
+          "label": "family"
+        },
+        {
+          "value": "pref__most_watched_movies__fantasy",
+          "label": "fantasy"
+        },
+        {
+          "value": "pref__most_watched_movies__horror",
+          "label": "horror"
+        },
+        {
+          "value": "pref__most_watched_movies__musical",
+          "label": "musical"
+        },
+        {
+          "value": "pref__most_watched_movies__mystery",
+          "label": "mystery"
+        },
+        {
+          "value": "pref__most_watched_movies__romance",
+          "label": "romance"
+        },
+        {
+          "value": "pref__most_watched_movies__sci_fi",
+          "label": "sci fi"
+        },
+        {
+          "value": "pref__most_watched_movies__sport",
+          "label": "sport"
+        },
+        {
+          "value": "pref__most_watched_movies__thriller",
+          "label": "thriller"
+        },
+        {
+          "value": "pref__most_watched_movies__war",
+          "label": "war"
+        },
+        {
+          "value": "pref__most_watched_movies__western",
+          "label": "western"
+        }
       ]
     },
     {
@@ -203,17 +566,50 @@
       "value_type": "categorical",
       "label": "Most Watched Tv Programmes",
       "options": [
-        "pref__most_watched_tv_programmes__children_s",
-        "pref__most_watched_tv_programmes__comedy",
-        "pref__most_watched_tv_programmes__drama",
-        "pref__most_watched_tv_programmes__entertainment_variety_shows",
-        "pref__most_watched_tv_programmes__factual",
-        "pref__most_watched_tv_programmes__learning",
-        "pref__most_watched_tv_programmes__music",
-        "pref__most_watched_tv_programmes__news",
-        "pref__most_watched_tv_programmes__religion_ethics",
-        "pref__most_watched_tv_programmes__sport",
-        "pref__most_watched_tv_programmes__weather"
+        {
+          "value": "pref__most_watched_tv_programmes__children_s",
+          "label": "children's"
+        },
+        {
+          "value": "pref__most_watched_tv_programmes__comedy",
+          "label": "comedy"
+        },
+        {
+          "value": "pref__most_watched_tv_programmes__drama",
+          "label": "drama"
+        },
+        {
+          "value": "pref__most_watched_tv_programmes__entertainment_variety_shows",
+          "label": "entertainment variety shows"
+        },
+        {
+          "value": "pref__most_watched_tv_programmes__factual",
+          "label": "factual"
+        },
+        {
+          "value": "pref__most_watched_tv_programmes__learning",
+          "label": "learning"
+        },
+        {
+          "value": "pref__most_watched_tv_programmes__music",
+          "label": "music"
+        },
+        {
+          "value": "pref__most_watched_tv_programmes__news",
+          "label": "news"
+        },
+        {
+          "value": "pref__most_watched_tv_programmes__religion_ethics",
+          "label": "religion ethics"
+        },
+        {
+          "value": "pref__most_watched_tv_programmes__sport",
+          "label": "sport"
+        },
+        {
+          "value": "pref__most_watched_tv_programmes__weather",
+          "label": "weather"
+        }
       ]
     }
   ]

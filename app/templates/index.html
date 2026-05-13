@@ -33,8 +33,7 @@
       <h2 class="panel-title">Customer profile</h2>
       <p class="hint">
         Use <strong>Information</strong> fields (prefix <code>inf</code>) and <strong>Preference</strong> fields (prefix <code>pref</code>).
-        Enter numbers where required, or choose one option per categorical dropdown (each option is a full
-        <code>type__name__value</code> token from the feature manifest). You can instead upload a single-row UTF-8 CSV
+        Enter <strong>non-negative</strong> numbers where required, or choose one option per categorical dropdown (stored value is the manifest token; display text is defined per option in <code>profile_attributes.json</code>). You can instead upload a single-row UTF-8 CSV
         whose headers match <a href="/profile/csv-template">this template</a> (see <code>app/sample_valid_profile.csv</code> for an example). If a CSV is attached, it overrides the form.
       </p>
 
@@ -55,13 +54,14 @@
                 name="{{ attr.id }}"
                 type="number"
                 step="any"
+                min="0"
                 inputmode="decimal"
                 value="0"
               />
             {% else %}
               <select id="{{ attr.id }}" name="{{ attr.id }}">
                 {% for opt in attr.options %}
-                  <option value="{{ opt }}"{% if loop.first %} selected{% endif %}>{{ opt.split('__')[-1] | replace('_', ' ') }}</option>
+                  <option value="{{ opt.value }}"{% if loop.first %} selected{% endif %}>{{ opt.label }}</option>
                 {% endfor %}
               </select>
             {% endif %}
@@ -81,13 +81,14 @@
                 name="{{ attr.id }}"
                 type="number"
                 step="any"
+                min="0"
                 inputmode="decimal"
                 value="0"
               />
             {% else %}
               <select id="{{ attr.id }}" name="{{ attr.id }}">
                 {% for opt in attr.options %}
-                  <option value="{{ opt }}"{% if loop.first %} selected{% endif %}>{{ opt.split('__')[-1] | replace('_', ' ') }}</option>
+                  <option value="{{ opt.value }}"{% if loop.first %} selected{% endif %}>{{ opt.label }}</option>
                 {% endfor %}
               </select>
             {% endif %}
