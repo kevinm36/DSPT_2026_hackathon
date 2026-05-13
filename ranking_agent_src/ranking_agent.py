@@ -21,8 +21,7 @@ Payload
         "Health & Fitness": 1,
         "Style & Fashion": 0,
         ...
-      },
-      "description": "optional free-text description of the ad image"
+      }
     },
     ...
   ],
@@ -75,7 +74,7 @@ You are an ad-ranking analyst. You receive:
    IAB Tier 1 category names to numeric affinity scores.  Higher scores mean the
    user is more interested in that category.
 2. A set of candidate ad images, each with its own IAB profile (binary or
-   weighted) and optionally a short description.
+   weighted).
 
 Your job:
 - Rank the candidate ads from best to worst fit for the user.
@@ -131,10 +130,9 @@ def _build_prompt(user_profile: dict, scored_ads: list[dict], top_k: int) -> str
         iab_str = ", ".join(
             cat for cat, val in ad.get("iab_profile", {}).items() if val
         )
-        desc = ad.get("description", "No description provided")
         ad_lines.append(
             f"  #{i}  id={ad['id']}  score={ad['_score']}  "
-            f"categories=[{iab_str}]  description=\"{desc}\""
+            f"categories=[{iab_str}]"
         )
 
     remaining_lines = []
