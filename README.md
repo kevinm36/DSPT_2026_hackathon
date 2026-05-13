@@ -1,3 +1,19 @@
+# Creative Engagement Simulator
+
+As part of the Decision Sciences Personalization Technologies team, we are mostly interested in how we can personalize Creative Delivery to our client's customers based on their past engagement history (e.g. what ad did they click on) and their personal profiles.
+
+In this Hackathon project, we explore the use of Agentic Workflow to characterize images, and more importantly, to understand why a customer like or dislike a creative image. This understand can help us optimize our Advertisement Campaign towards better engagement.
+
+## Data used
+
+We used [Kaggle's ADS-16 dataset](https://www.kaggle.com/datasets/groffo/ads16-dataset) to build this demo.
+
+## To run the simulator
+
+- You first have to set up a conda environment with all dependencies, see `environment.yml`.
+- You also have to get access to the AWS Bedrock agent, and set up the corresponding environment variables with proper credentials. See `.kiro/specs/agentic-image-classification/agentcore-deployment.md` for how to set this up.
+- The demo can be run via `uvicorn app.main:app --reload --app-dir .`
+
 # ADS-16 User-Interest Modeling
 
 This repo runs two complementary models on the ADS-16 corpus:

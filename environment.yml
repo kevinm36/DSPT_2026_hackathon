@@ -1,0 +1,42 @@
+# Master conda environment for this repository (single env for all modules).
+#
+# Sources merged:
+#   - app/environment.yml — FastAPI + Jinja2 web UI
+#   - basic_img_agent_src/requirements.txt
+#   - feature_extraction_agent_src/requirements.txt
+#   - image_ranking_agent_src/requirements.txt
+#   - ranking_agent_src/requirements.txt
+#     (all list: bedrock-agentcore, strands-agents → installed via pip below)
+#   - src/ — imports across data_loader, model, ad_design, agentcore, inference:
+#     boto3, numpy, pandas, scipy, scikit-learn, joblib
+#
+# Create / update (from repo root):
+#   conda env create -f environment.yml
+#   conda activate dspt-hackathon
+#   conda env update -f environment.yml --prune
+#
+name: dspt-hackathon
+channels:
+  - conda-forge
+dependencies:
+  - python>=3.11,<3.14
+
+  # Web UI (app/)
+  - "fastapi>=0.115,<1"
+  - "uvicorn>=0.32,<1"
+  - "jinja2>=3.1,<4"
+  - "python-multipart>=0.0.12,<1"
+
+  # ML, data pipeline, AWS deploy utilities (src/)
+  - numpy
+  - pandas
+  - scipy
+  - scikit-learn
+  - joblib
+  - boto3
+
+  # AgentCore + Strands (PyPI; required by *_agent_src agents and generated handlers)
+  - pip
+  - pip:
+      - bedrock-agentcore
+      - strands-agents
