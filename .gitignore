@@ -1,7 +1,6 @@
 Data/
 
 # Secrets / env config (never commit)
-config/agentcore.env
 .env
 
 # macOS
