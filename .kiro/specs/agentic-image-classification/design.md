@@ -115,6 +115,22 @@ Post-processor that converts agent JSONL responses into a per-image multi-hot ca
 
 Per-user data processor that combines a user's 300 ad ratings with the multi-hot feature matrix to produce a weighted IAB preference vector (`user_vector = ratings @ multihot_matrix`). Consumes the CSV output of `multihot_from_responses`.
 
+## User Interest Modeling (`src/model/`)
+
+The model module trains supervised models that predict per-category user interest from demographic/behavioral features. It consumes the multi-hot ad vectors (from the classification pipeline) and user ratings to learn the mapping from sparse user metadata to rich IAB preference profiles.
+
+**High-level flow:**
+1. Build a ground-truth interest matrix from ratings × multi-hot (exposure-corrected)
+2. Train per-category models (Logistic Regression, Ridge, kNN) on user features
+3. Evaluate via cross-validated ranking metrics (AUC, AP, Spearman)
+
+**Three model families are compared:**
+- **Logistic Regression** — binary "does user like category k?", interpretable coefficients
+- **Ridge Regression** — continuous interest score prediction
+- **kNN** — non-parametric similarity-based prediction (cosine distance)
+
+> **Full specification:** See #[[file:model-module.md]] for detailed API documentation, data flow diagrams, label construction logic, and design decisions.
+
 ## Two-Stage Architecture: LR Profile → LLM Ranking
 
 ### Why the LR?

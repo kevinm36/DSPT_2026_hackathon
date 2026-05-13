@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Prediction results{% endblock %}
+{% block content %}
+  <nav class="results-nav">
+    <a class="btn ghost" href="/">← New prediction</a>
+  </nav>
+
+  <section class="card results-page">
+    <h2 class="panel-title">Ranked images</h2>
+    <p class="hint">Order is highest score first. Select a thumbnail to load model attributes and reasoning below.</p>
+
+    <div class="result-gallery" role="list">
+      {% for item in items %}
+        <button
+          type="button"
+          class="result-thumb"
+          role="listitem"
+          data-slot="{{ item.slot }}"
+          hx-get="/results/partials/detail/{{ rid }}/{{ item.slot }}"
+          hx-target="#detail-slot"
+          hx-swap="innerHTML"
+          aria-label="Show details for {{ item.filename }}, rank {{ item.rank }}"
+        >
+          <span class="thumb-rank">#{{ item.rank }}</span>
+          <span class="thumb-frame">
+            <img src="{{ item.thumbnail_src }}" alt="" loading="lazy" width="120" height="120" />
+          </span>
+          <span class="thumb-meta">
+            <span class="thumb-name" title="{{ item.filename }}">{{ item.filename }}</span>
+            <span class="thumb-score">{{ "%.4f"|format(item.score) }}</span>
+          </span>
+        </button>
+      {% endfor %}
+    </div>
+
+    <div
+      id="detail-slot"
+      class="detail-slot detail-slot--empty"
+      role="region"
+      aria-label="Image detail"
+    >
+      <p class="muted">Click an image to show model attributes and prediction reasoning.</p>
+    </div>
+  </section>
+
+  <script>
+    (function () {
+      document.body.addEventListener("htmx:beforeRequest", function (evt) {
+        var elt = evt.detail.elt;
+        if (!elt || !elt.classList.contains("result-thumb")) return;
+        document.querySelectorAll(".result-thumb").forEach(function (t) {
+          t.classList.remove("is-active");
+        });
+        elt.classList.add("is-active");
+        var slot = document.getElementById("detail-slot");
+        if (slot) slot.classList.remove("detail-slot--empty");
+      });
+    })();
+  </script>
+{% endblock %}

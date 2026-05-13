@@ -3,11 +3,9 @@
   <form
     id="main-form"
     class="card"
-    hx-post="/predict"
-    hx-target="#results"
-    hx-swap="innerHTML"
+    action="/results"
+    method="post"
     enctype="multipart/form-data"
-    hx-indicator="#predict-spinner"
   >
     <div class="tabs" role="tablist" aria-label="Input sections">
       <button type="button" class="tab is-active" data-tab-target="images" role="tab" aria-selected="true">
@@ -34,40 +32,78 @@
     <section id="panel-profile" class="tab-panel" role="tabpanel" hidden>
       <h2 class="panel-title">Customer profile</h2>
       <p class="hint">
-        Choose one value per attribute, or upload a single-row UTF-8 CSV whose headers match
-        <a href="/profile/csv-template">this template</a>. If a CSV is attached, it overrides the dropdowns.
+        Use <strong>Information</strong> fields (prefix <code>inf</code>) and <strong>Preference</strong> fields (prefix <code>pref</code>).
+        Enter <strong>non-negative</strong> numbers where required, or choose one option per categorical dropdown (stored value is the manifest token; display text is defined per option in <code>profile_attributes.json</code>). You can instead upload a single-row UTF-8 CSV
+        whose headers match <a href="/profile/csv-template">this template</a> (see <code>app/sample_valid_profile.csv</code> for an example). Choosing a file here fills the fields below from the first data row; you can edit any value before <strong>Predict</strong>—the server always uses the values currently shown in the form.
       </p>
 
       <div class="profile-csv">
-        <label for="profile_csv">Profile CSV (optional)</label>
-        <input id="profile_csv" type="file" name="profile_csv" accept=".csv,text/csv" />
+        <label for="profile_csv">Profile CSV (optional, local only)</label>
+        <input id="profile_csv" type="file" accept=".csv,text/csv" />
+        <p id="profile_csv_sync_status" class="hint subsection" role="status" aria-live="polite"></p>
       </div>
 
+      <h3 class="profile-section-title">Information</h3>
+      <p class="hint subsection">Demographics and related inputs (<code>inf__…</code>).</p>
       <div class="profile-grid">
-        {% for attr in attributes %}
+        {% for attr in attributes_information %}
           <div class="field">
-            <label for="{{ attr.id }}">{{ attr.label }}</label>
-            <select id="{{ attr.id }}" name="{{ attr.id }}">
-              <option value="" disabled selected hidden>Choose…</option>
-              {% for opt in attr.options %}
-                <option value="{{ opt }}">{{ opt }}</option>
-              {% endfor %}
-            </select>
+            <label for="{{ attr.id }}">{{ attr.label }} <span class="mono-id">({{ attr.id }})</span></label>
+            {% if attr.value_type == "numerical" %}
+              <input
+                id="{{ attr.id }}"
+                name="{{ attr.id }}"
+                type="number"
+                step="any"
+                min="0"
+                inputmode="decimal"
+                value="0"
+              />
+            {% else %}
+              <select id="{{ attr.id }}" name="{{ attr.id }}">
+                {% for opt in attr.options %}
+                  <option value="{{ opt.value }}"{% if loop.first %} selected{% endif %}>{{ opt.label }}</option>
+                {% endfor %}
+                <option value="invalid">{{ " " }}</option>
+              </select>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+
+      <h3 class="profile-section-title">Preference</h3>
+      <p class="hint subsection">Tastes and media preferences (<code>pref__…</code>).</p>
+      <div class="profile-grid">
+        {% for attr in attributes_preference %}
+          <div class="field">
+            <label for="{{ attr.id }}">{{ attr.label }} <span class="mono-id">({{ attr.id }})</span></label>
+            {% if attr.value_type == "numerical" %}
+              <input
+                id="{{ attr.id }}"
+                name="{{ attr.id }}"
+                type="number"
+                step="any"
+                min="0"
+                inputmode="decimal"
+                value="0"
+              />
+            {% else %}
+              <select id="{{ attr.id }}" name="{{ attr.id }}">
+                {% for opt in attr.options %}
+                  <option value="{{ opt.value }}"{% if loop.first %} selected{% endif %}>{{ opt.label }}</option>
+                {% endfor %}
+                <option value="invalid">{{ " " }}</option>
+              </select>
+            {% endif %}
           </div>
         {% endfor %}
       </div>
     </section>
 
     <div class="form-actions">
-      <button type="submit" class="btn primary" hx-disabled-elt="this">Predict</button>
-      <span id="predict-spinner" class="htmx-indicator muted">Running prediction…</span>
+      <button type="submit" class="btn primary">Predict</button>
     </div>
   </form>
-
-  <section id="results" class="results-host card" aria-live="polite">
-    <h2 class="panel-title">Results</h2>
-    <p class="muted">Submit the form to see ranked affinity scores here.</p>
-  </section>
 
   <script>
     (function () {
@@ -90,6 +126,135 @@
             panel.toggleAttribute("hidden", !on);
           });
         });
+      });
+    })();
+  </script>
+  <script>
+    (function () {
+      var statusEl = document.getElementById("profile_csv_sync_status");
+      var csvInput = document.getElementById("profile_csv");
+      var panel = document.getElementById("panel-profile");
+      if (!csvInput || !panel) return;
+
+      function setStatus(text) {
+        if (statusEl) statusEl.textContent = text || "";
+      }
+
+      function parseCsvLine(line) {
+        var out = [];
+        var cur = "";
+        var inQuotes = false;
+        for (var i = 0; i < line.length; i++) {
+          var c = line.charAt(i);
+          if (inQuotes) {
+            if (c === '"') {
+              if (line.charAt(i + 1) === '"') {
+                cur += '"';
+                i++;
+              } else {
+                inQuotes = false;
+              }
+            } else {
+              cur += c;
+            }
+          } else if (c === '"') {
+            inQuotes = true;
+          } else if (c === ",") {
+            out.push(cur);
+            cur = "";
+          } else {
+            cur += c;
+          }
+        }
+        out.push(cur);
+        return out;
+      }
+
+      function isValidNonNegativeNumberString(s) {
+        var t = String(s == null ? "" : s).trim();
+        if (t === "") return false;
+        var n = Number(t);
+        if (!Number.isFinite(n)) return false;
+        if (n < 0) return false;
+        return true;
+      }
+
+      function resetProfileFieldsToDefaults() {
+        panel.querySelectorAll('.profile-grid input[type="number"]').forEach(function (inp) {
+          inp.value = "0";
+        });
+        panel.querySelectorAll(".profile-grid select").forEach(function (sel) {
+          if (sel.options.length) sel.selectedIndex = 0;
+        });
+      }
+
+      function applyRowToForm(rowMap) {
+        panel.querySelectorAll('.profile-grid input[type="number"]').forEach(function (inp) {
+          var name = inp.name;
+          if (!name || !Object.prototype.hasOwnProperty.call(rowMap, name)) return;
+          var cell = rowMap[name];
+          if (isValidNonNegativeNumberString(cell)) {
+            inp.value = String(String(cell).trim());
+          } else {
+            inp.value = "";
+          }
+        });
+        panel.querySelectorAll(".profile-grid select").forEach(function (sel) {
+          var name = sel.name;
+          if (!name || !Object.prototype.hasOwnProperty.call(rowMap, name)) return;
+          var val = rowMap[name];
+          var found = false;
+          for (var j = 0; j < sel.options.length; j++) {
+            if (sel.options[j].value === val) {
+              found = true;
+              break;
+            }
+          }
+          if (found) {
+            sel.value = val;
+          } else {
+            sel.value = "invalid";
+          }
+        });
+      }
+
+      csvInput.addEventListener("change", function () {
+        var file = csvInput.files && csvInput.files[0];
+        if (!file) {
+          resetProfileFieldsToDefaults();
+          setStatus("CSV cleared; profile fields reset to defaults.");
+          return;
+        }
+
+        var reader = new FileReader();
+        reader.onload = function () {
+          var text = String(reader.result || "");
+          if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
+          var rawLines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
+          var lines = rawLines.filter(function (l) {
+            return l.replace(/\s/g, "").length > 0;
+          });
+          if (lines.length < 2) {
+            setStatus("CSV needs a header row and one data row; fields not updated.");
+            return;
+          }
+          var headers = parseCsvLine(lines[0]);
+          var cells = parseCsvLine(lines[1]);
+          if (headers.length !== cells.length) {
+            setStatus("Header and data row have different column counts; fields not updated.");
+            return;
+          }
+          var rowMap = {};
+          for (var i = 0; i < headers.length; i++) {
+            rowMap[headers[i].trim()] = cells[i].trim();
+          }
+          applyRowToForm(rowMap);
+          setStatus("Form fields updated from CSV. Edit as needed, then Predict uses the values shown above.");
+        };
+        reader.onerror = function () {
+          setStatus("Could not read the file; fields not updated.");
+        };
+        reader.readAsText(file, "UTF-8");
       });
     })();
   </script>

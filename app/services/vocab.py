@@ -1,15 +1,40 @@
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass
 from pathlib import Path
+
+# UI-only sentinel for categoricals (not stored in profile_attributes.json options).
+INVALID_CATEGORICAL_PLACEHOLDER = "invalid"
+# Internal sentinel for failed numerical validation (empty, ill-formed, negative, non-finite).
+INVALID_NUMERICAL_PLACEHOLDER = "__invalid_numerical__"
+
+
+@dataclass(frozen=True)
+class CategoricalOption:
+    """Maps a stored attribute token (e.g. multihot column name) to a user-facing label."""
+
+    value: str
+    label: str
 
 
 @dataclass(frozen=True)
 class AttributeSpec:
     id: str
     label: str
-    options: tuple[str, ...]
+    kind: str
+    value_type: str
+    options: tuple[CategoricalOption, ...]
+
+
+def _default_label_from_token(token: str) -> str:
+    """Fallback display label when JSON lists options as plain strings (legacy)."""
+    if token.count("__") >= 2:
+        part = token.split("__", 2)[-1]
+    else:
+        part = token
+    return part.replace("_", " ").strip()
 
 
 def load_profile_vocab(path: Path) -> tuple[AttributeSpec, ...]:
@@ -24,19 +49,68 @@ def load_profile_vocab(path: Path) -> tuple[AttributeSpec, ...]:
             raise ValueError("Each attribute must be an object")
         attr_id = item.get("id")
         label = item.get("label")
-        options = item.get("options")
+        kind = item.get("kind")
+        value_type = item.get("value_type")
+        options = item.get("options", [])
         if not isinstance(attr_id, str) or not attr_id.strip():
             raise ValueError("Each attribute needs a non-empty string id")
         if not isinstance(label, str) or not label.strip():
             raise ValueError(f"Attribute {attr_id!r} needs a label")
-        if not isinstance(options, list) or not options:
-            raise ValueError(f"Attribute {attr_id!r} needs a non-empty options list")
-        str_options: list[str] = []
+        if kind not in ("information", "preference"):
+            raise ValueError(f"Attribute {attr_id!r} needs kind 'information' or 'preference'")
+        if value_type not in ("numerical", "categorical"):
+            raise ValueError(f"Attribute {attr_id!r} needs value_type 'numerical' or 'categorical'")
+        if not isinstance(options, list):
+            raise ValueError(f"Attribute {attr_id!r} options must be a list")
+
+        parsed: list[CategoricalOption] = []
         for opt in options:
-            if not isinstance(opt, str) or not opt.strip():
-                raise ValueError(f"Invalid option for {attr_id!r}")
-            str_options.append(opt)
-        specs.append(AttributeSpec(id=attr_id, label=label, options=tuple(str_options)))
+            if isinstance(opt, str):
+                v = opt.strip()
+                if not v:
+                    raise ValueError(f"Invalid option string for {attr_id!r}")
+                if v == INVALID_CATEGORICAL_PLACEHOLDER:
+                    raise ValueError(
+                        f"Option value {INVALID_CATEGORICAL_PLACEHOLDER!r} is reserved for the UI; "
+                        f"choose a different token for {attr_id!r}"
+                    )
+                parsed.append(CategoricalOption(value=v, label=_default_label_from_token(v)))
+            elif isinstance(opt, dict):
+                v = opt.get("value")
+                lb = opt.get("label")
+                if not isinstance(v, str) or not v.strip():
+                    raise ValueError(f"Each categorical option for {attr_id!r} needs a non-empty string value")
+                if v.strip() == INVALID_CATEGORICAL_PLACEHOLDER:
+                    raise ValueError(
+                        f"Option value {INVALID_CATEGORICAL_PLACEHOLDER!r} is reserved for the UI; "
+                        f"choose a different token for {attr_id!r}"
+                    )
+                if not isinstance(lb, str) or not lb.strip():
+                    raise ValueError(f"Each categorical option for {attr_id!r} needs a non-empty string label")
+                parsed.append(CategoricalOption(value=v.strip(), label=lb.strip()))
+            else:
+                raise ValueError(f"Each option for {attr_id!r} must be a string or an object with value and label")
+
+        if value_type == "categorical" and not parsed:
+            raise ValueError(f"Categorical attribute {attr_id!r} needs a non-empty options list")
+        if value_type == "numerical" and parsed:
+            raise ValueError(f"Numerical attribute {attr_id!r} must have an empty options list")
+
+        seen_vals: set[str] = set()
+        for o in parsed:
+            if o.value in seen_vals:
+                raise ValueError(f"Duplicate option value {o.value!r} for attribute {attr_id!r}")
+            seen_vals.add(o.value)
+
+        specs.append(
+            AttributeSpec(
+                id=attr_id,
+                label=label,
+                kind=kind,
+                value_type=value_type,
+                options=tuple(parsed),
+            )
+        )
 
     seen: set[str] = set()
     for spec in specs:
@@ -50,13 +124,39 @@ def load_profile_vocab(path: Path) -> tuple[AttributeSpec, ...]:
 def validate_profile(
     profile: dict[str, str], vocab: tuple[AttributeSpec, ...]
 ) -> dict[str, str]:
-    allowed = {spec.id: set(spec.options) for spec in vocab}
     out: dict[str, str] = {}
     for spec in vocab:
-        val = profile.get(spec.id)
-        if val is None or val == "":
-            raise ValueError(f"Missing value for {spec.label} ({spec.id})")
-        if val not in allowed[spec.id]:
-            raise ValueError(f"Invalid value for {spec.label}: {val!r}")
+        raw = profile.get(spec.id)
+        if raw is None:
+            raw = ""
+        val = raw.strip() if isinstance(raw, str) else str(raw).strip()
+
+        if spec.value_type == "categorical":
+            if val == "":
+                raise ValueError(f"Missing value for {spec.label} ({spec.id})")
+            if val == INVALID_CATEGORICAL_PLACEHOLDER:
+                out[spec.id] = val
+                continue
+            allowed = {o.value for o in spec.options}
+            if val not in allowed:
+                raise ValueError(f"Invalid value for {spec.label}: {val!r}")
+            out[spec.id] = val
+            continue
+
+        if val == INVALID_NUMERICAL_PLACEHOLDER:
+            out[spec.id] = val
+            continue
+        if val == "":
+            out[spec.id] = INVALID_NUMERICAL_PLACEHOLDER
+            continue
+        try:
+            num = float(val)
+        except ValueError:
+            out[spec.id] = INVALID_NUMERICAL_PLACEHOLDER
+            continue
+        if not math.isfinite(num) or num < 0:
+            out[spec.id] = INVALID_NUMERICAL_PLACEHOLDER
+            continue
         out[spec.id] = val
+
     return out
