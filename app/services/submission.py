@@ -9,6 +9,7 @@ from fastapi import UploadFile
 
 from app.services.vocab import (
     INVALID_CATEGORICAL_PLACEHOLDER,
+    INVALID_NUMERICAL_PLACEHOLDER,
     AttributeSpec,
     validate_profile,
 )
@@ -69,13 +70,13 @@ def data_url_for_image(content_type: str, raw: bytes) -> str:
 async def collect_submission(
     *,
     images: list[UploadFile],
-    profile_csv: UploadFile | None,
     form_map: dict[str, Any],
     vocab: tuple[AttributeSpec, ...],
 ) -> tuple[list[dict[str, Any]], dict[str, str]] | str:
     """
     Returns (image_rows, profile) on success, where each image row has
-    filename, raw bytes, content_type. On failure returns an error message string.
+    filename, raw bytes, content_type. Profile values are taken from form_map
+    (multipart field names matching attribute ids). On failure returns an error message string.
     """
     non_empty_images = [f for f in images if f.filename]
     if not non_empty_images:
@@ -101,23 +102,21 @@ async def collect_submission(
 
     profile_raw: dict[str, str]
     try:
-        if profile_csv and profile_csv.filename:
-            text = (await profile_csv.read()).decode("utf-8")
-            profile_raw = parse_profile_csv(text, vocab)
-        else:
-            profile_raw = merge_profile_from_form(form_map, vocab)
+        profile_raw = merge_profile_from_form(form_map, vocab)
         profile = validate_profile(profile_raw, vocab)
     except ValueError as exc:
         return str(exc)
-    except UnicodeDecodeError:
-        return "Profile CSV must be UTF-8 encoded text."
 
-    invalid_labels = sorted(
-        spec.label
-        for spec in vocab
-        if spec.value_type == "categorical"
-        and profile.get(spec.id) == INVALID_CATEGORICAL_PLACEHOLDER
-    )
+    def _is_invalid_field(spec: AttributeSpec) -> bool:
+        if spec.value_type == "categorical":
+            return profile.get(spec.id) == INVALID_CATEGORICAL_PLACEHOLDER
+        if spec.value_type == "numerical":
+            return profile.get(spec.id) == INVALID_NUMERICAL_PLACEHOLDER
+        return False
+
+    invalid_labels = [
+        spec.label for spec in vocab if spec.kind == "information" and _is_invalid_field(spec)
+    ] + [spec.label for spec in vocab if spec.kind == "preference" and _is_invalid_field(spec)]
     if invalid_labels:
         joined = ", ".join(invalid_labels)
         return f"Some profile fields are invalid. Invalid fields: {joined}."
