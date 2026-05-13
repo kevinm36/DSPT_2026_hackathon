@@ -3,11 +3,9 @@
   <form
     id="main-form"
     class="card"
-    hx-post="/predict"
-    hx-target="#results"
-    hx-swap="innerHTML"
+    action="/results"
+    method="post"
     enctype="multipart/form-data"
-    hx-indicator="#predict-spinner"
   >
     <div class="tabs" role="tablist" aria-label="Input sections">
       <button type="button" class="tab is-active" data-tab-target="images" role="tab" aria-selected="true">
@@ -48,9 +46,8 @@
           <div class="field">
             <label for="{{ attr.id }}">{{ attr.label }}</label>
             <select id="{{ attr.id }}" name="{{ attr.id }}">
-              <option value="" disabled selected hidden>Choose…</option>
               {% for opt in attr.options %}
-                <option value="{{ opt }}">{{ opt }}</option>
+                <option value="{{ opt }}"{% if loop.first %} selected{% endif %}>{{ opt }}</option>
               {% endfor %}
             </select>
           </div>
@@ -59,15 +56,9 @@
     </section>
 
     <div class="form-actions">
-      <button type="submit" class="btn primary" hx-disabled-elt="this">Predict</button>
-      <span id="predict-spinner" class="htmx-indicator muted">Running prediction…</span>
+      <button type="submit" class="btn primary">Predict</button>
     </div>
   </form>
-
-  <section id="results" class="results-host card" aria-live="polite">
-    <h2 class="panel-title">Results</h2>
-    <p class="muted">Submit the form to see ranked affinity scores here.</p>
-  </section>
 
   <script>
     (function () {
