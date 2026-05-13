@@ -17,8 +17,8 @@ def _load_model():
     """Swap in AgentModel if ARN is configured, otherwise keep stub."""
     import app.services.model_service as ms
     try:
-        from image_ranking_agent_pipeline.image_ranking_agent_model import AgentModel
-        ms.default_agent_model = AgentModel()
+        from image_ranking_agent_pipeline.image_ranking_agent_model import ImageRankingAgentModel
+        ms.default_agent_model = ImageRankingAgentModel()
         print("\u2713 Using AgentModel (image ranking agent)")
     except (RuntimeError, Exception) as e:
         print(f"\u26a0 AgentModel not available ({e}), using stub")

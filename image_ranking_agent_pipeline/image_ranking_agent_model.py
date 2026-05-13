@@ -27,7 +27,7 @@ from app.services.model_service import CustomInferenceInterface, ImagePrediction
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
-class AgentModel(CustomInferenceInterface):
+class ImageRankingAgentModel(CustomInferenceInterface):
     """Calls the deployed image ranking agent to classify and score ads."""
 
     def __init__(self, agent_arn: str | None = None, region: str | None = None,
